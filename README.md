@@ -13,6 +13,7 @@
 - [Como Usar](#como-usar)
 - [Versões Disponíveis](#versões)
 - [Configuração Avançada](#configuração-avançada)
+- [API de Integração](#api)
 - [Limitações Atuais](#limitações)
 - [Próximos Passos](#próximos-passos)
 - [Autor](#autor)
@@ -76,7 +77,7 @@ O **Mini Agente de Eventos** é uma aplicação web projetada para extrair infor
 7. No modo Gemini, você pode:
    - Editar qualquer evento detectado
    - Selecionar quais eventos deseja enviar
-8. Clique em "Enviar para API" para enviar os dados do(s) evento(s) selecionado(s)
+8. Clique em "Enviar para API" para enviar os dados do(s) evento(s) selecionado(s) para o servidor web2py
 
 ## 🔄 Versões Disponíveis <a name="versões"></a>
 
@@ -113,6 +114,39 @@ Para melhorar os resultados de extração, você pode acessar as opções avanç
 2. Ativar/desativar análise detalhada (com explicações adicionais)
 
 Em ambos os modos, clique em "Reprocessar com estas opções" para aplicar as configurações.
+
+## 🔌 API de Integração <a name="api"></a>
+
+O sistema integra-se com uma API Web2py para armazenar os eventos extraídos. A API está hospedada em `mtcporto2.pythonanywhere.com` e oferece os seguintes endpoints:
+
+- `POST /eventos/default/eventos`: Adiciona um novo evento ao banco de dados
+- `GET /eventos/default/eventos`: Lista eventos cadastrados
+
+### Implementação da API
+
+Para implementar a API no servidor Web2py, foram criados os seguintes arquivos de referência:
+
+- `api_default.py`: Código do controlador para ser adicionado ao `default.py` no servidor Web2py
+- `API_implementacao.md`: Guia detalhado para implementação da API no servidor
+- `API_seguranca.md`: Recomendações de segurança para a API em produção
+- `test_api.py`: Script Python para testar a API após implementação
+
+### Estrutura de Dados
+
+A API recebe os seguintes campos:
+
+| Campo      | Tipo   | Obrigatório | Descrição                       |
+|------------|--------|-------------|----------------------------------|
+| oque       | string | Sim         | Título/nome do evento            |
+| quando     | string | Sim         | Data e hora no formato "DD/MM/AAAA HH:MM" |
+| onde       | string | Sim         | Cidade/localidade                |
+| fonte      | string | Sim         | Fonte da informação (promotor)   |
+| local      | string | Sim         | Nome do local específico         |
+| imagem     | string | Não         | URL ou Base64 da imagem          |
+| endereco   | string | Não         | Endereço completo                |
+| preco      | string | Não         | Preço do evento                  |
+| descricao  | string | Não         | Descrição adicional              |
+| tipo       | string | Não         | Tipo de evento (show, festa etc) |
 
 ## 🚧 Limitações Atuais <a name="limitações"></a>
 

@@ -850,9 +850,9 @@
       sendButton.textContent = "Enviando...";
       sendButton.disabled = true;
       
-      try {
-        // Enviar cada evento individualmente
+      try {        // Enviar cada evento individualmente
         const resultados = await Promise.all(eventosSelecionados.map(async (evento) => {          // Dados a serem enviados para a API (conforme formato requerido)
+          // Mapeando para os novos nomes de campos com prefixos f_
           const dadosApi = {
             oque: evento.atracao,
             quando: `${evento.data} ${evento.hora}`,
