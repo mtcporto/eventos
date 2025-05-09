@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <title>Mini Agente - Eventos</title>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@v5.1.1/dist/tesseract.min.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; max-width: 600px; margin: auto; }
+    input, button { margin: 10px 0; padding: 8px; width: 100%; }
+    #preview { max-width: 100%; margin-top: 10px; border: 1px solid #ccc; }
+    pre { background: #f5f5f5; padding: 10px; }
+  </style>
+</head>
+<body>
+  <h2>Mini Agente de Eventos</h2>
+
+  <input type="file" accept="image/*" id="imageInput" />
+  <img id="preview" />
+  <button onclick="processImage()">Extrair Evento</button>
+
+  <h4>Texto extraído:</h4>
+  <pre id="rawText">---</pre>
+
+  <h4>Evento detectado:</h4>
+  <pre id="parsedData">---</pre>
+
+  <button onclick="enviarEvento()">Enviar para API</button>
+
+  <script>
+    let rawText = "";
+    let evento = {};
+
+    function processImage() {
+      const input = document.getElementById("imageInput");
+      const file = input.files[0];
+      if (!file) return alert("Selecione uma imagem.");
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById("preview").src = e.target.result;
+        Tesseract.recognize(e.target.result, 'por', {
+          logger: m => console.log(m)
+        }).then(({ data: { text } }) => {
+          document.getElementById("rawText").innerText = text;
+          rawText = text;
+          evento = parseEvento(text);
+          document.getElementById("parsedData").innerText = JSON.stringify(evento, null, 2);
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function parseEvento(texto) {
+      const evento = {};
+
+      // Detecção simplificada (pode melhorar com NLP)
+      const dataMatch = texto.match(/\d{1,2}\/\d{1,2}(\/\d{2,4})?/);
+      const horaMatch = texto.match(/\d{1,2}h/);
+      const localMatch = texto.match(/(bar|pub|casa|arena)\s+\w+/i);
+      const atracaoMatch = texto.match(/(show|ao vivo|DJ|banda).*/i);
+
+      evento.data = dataMatch ? dataMatch[0] : "";
+      evento.hora = horaMatch ? horaMatch[0].replace('h', ':00') : "";
+      evento.local = localMatch ? localMatch[0] : "";
+      evento.atracao = atracaoMatch ? atracaoMatch[0] : "";
+
+      return evento;
+    }
+
+    function enviarEvento() {
+      if (!evento.atracao) return alert("Nenhum evento detectado ainda.");
+      fetch("https://sua-api.com/eventos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(evento)
+      })
+      .then(res => res.json())
+      .then(data => alert("Enviado com sucesso!"))
+      .catch(err => alert("Erro ao enviar: " + err.message));
+    }
+  </script>
+</body>
+</html>
