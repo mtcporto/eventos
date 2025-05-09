@@ -3,10 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mini Agente - Eventos</title>  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@v5.1.1/dist/tesseract.min.js"></script>
-  <!-- Adicionando título da página e metadados de SEO -->
-  <meta name="description" content="Extraia informações de eventos a partir de imagens de cartazes com Gemini AI ou OCR">
-  <meta name="keywords" content="OCR, Gemini, Google AI, extração de texto, eventos, cartazes">
+  <title>Mini Agente - Eventos (Gemini)</title>
   <style>
     :root {
       --primary: #3498db;
@@ -99,6 +96,11 @@
     
     button:hover {
       background-color: #27ae60;
+    }
+    
+    button:disabled {
+      background-color: #cccccc;
+      cursor: not-allowed;
     }
     
     .preview-container {
@@ -208,6 +210,38 @@
       text-decoration: underline;
     }
     
+    .mode-toggle {
+      display: flex;
+      justify-content: center;
+      margin-bottom: 15px;
+      gap: 10px;
+    }
+    
+    .mode-button {
+      padding: 10px 15px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
+      transition: all 0.3s;
+      width: auto;
+    }
+    
+    .mode-button.active {
+      box-shadow: 0 0 0 2px white, 0 0 0 4px var(--primary);
+    }
+    
+    .ocr-mode {
+      background-color: #f1c40f;
+      color: #333;
+    }
+    
+    .gemini-mode {
+      background-color: #9b59b6;
+      color: white;
+    }
+    
     @media (max-width: 600px) {
       body {
         padding: 10px;
@@ -216,12 +250,17 @@
   </style>
 </head>
 <body>  <div class="container">
-    <h2>Mini Agente de Eventos (Modo OCR)</h2>
+    <h2>Mini Agente de Eventos (Modo Gemini)</h2>
     
     <div style="text-align: center; margin-bottom: 15px;">
       <a href="escolha.html" style="color: var(--primary); font-size: 0.9em; text-decoration: none;">← Voltar para escolha</a>
       <span style="margin: 0 10px;">|</span>
-      <a href="index-gemini.html" style="color: var(--primary); font-size: 0.9em; text-decoration: none;">Alternar para modo Gemini →</a>
+      <a href="index.html" style="color: var(--primary); font-size: 0.9em; text-decoration: none;">Alternar para modo OCR →</a>
+    </div>
+    
+    <div class="mode-toggle">
+      <button class="mode-button ocr-mode" id="ocrModeBtn" onclick="setMode('ocr')">Modo OCR</button>
+      <button class="mode-button gemini-mode active" id="geminiModeBtn" onclick="setMode('gemini')">Modo Gemini</button>
     </div>
     
     <div class="input-area">
@@ -245,10 +284,10 @@
   </div>
   
   <div class="container result-container" id="resultContainer" style="display: none;">
-    <h4>Texto extraído:</h4>
+    <h4 id="extractedTextHeader">Texto extraído:</h4>
     <pre id="rawText">---</pre>
     
-    <div class="confidence-meter">
+    <div class="confidence-meter" id="confidenceContainer">
       <div class="confidence-value" id="confidenceMeter" style="width: 0%"></div>
     </div>
     <p id="confidenceText" style="text-align: right; margin: 5px 0; font-size: 12px;">Confiança: 0%</p>
@@ -259,25 +298,93 @@
     <button onclick="enviarEvento()">Enviar para API</button>
   </div>
   
-  <div class="container">
+  <div class="container" id="optionsContainer">
     <span class="toggle-advanced" onclick="toggleAdvanced()">Opções Avançadas ▾</span>
     <div class="advanced-options" id="advancedOptions">
-      <h4>Configurações de OCR</h4>
-      <select id="ocrEngine">
-        <option value="por">Português</option>
-        <option value="eng">Inglês</option>
-        <option value="por+eng">Português + Inglês</option>
-      </select>
-      <label><input type="checkbox" id="useEnhancement" checked> Aprimorar imagem antes do OCR</label>
+      <div id="ocrOptions">
+        <h4>Configurações de OCR</h4>
+        <select id="ocrEngine">
+          <option value="por">Português</option>
+          <option value="eng">Inglês</option>
+          <option value="por+eng">Português + Inglês</option>
+        </select>
+        <label><input type="checkbox" id="useEnhancement" checked> Aprimorar imagem antes do OCR</label>
+      </div>
+      <div id="geminiOptions">
+        <h4>Configurações do Gemini</h4>
+        <label><input type="checkbox" id="geminiDetailed" checked> Análise detalhada</label>
+        <label><input type="range" id="geminiTemperature" min="0" max="100" value="20"> Temperatura: <span id="temperatureValue">0.2</span></label>
+      </div>
       <button onclick="reprocessWithOptions()">Reprocessar com estas opções</button>
     </div>
   </div>
 
   <script>
+    // --- Configuração ---
+    const GEMINI_API_KEY = "AIzaSyAQR7qRaUJ6wpEq_RrGSUzodbkmVbz7Gdk"; // <= SUBSTITUA PELA SUA CHAVE
+    const GEMINI_MODEL_ID = "gemini-1.5-flash-latest"; // Modelo a ser usado
+    const GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
+
+    // --- Variáveis globais ---
     let rawText = "";
     let evento = {};
     let confidence = 0;
     let lastImageData = null;
+    let currentMode = "gemini"; // Modo padrão: gemini ou ocr
+    
+    // --- Elementos DOM ---
+    const ocrModeBtn = document.getElementById('ocrModeBtn');
+    const geminiModeBtn = document.getElementById('geminiModeBtn');
+    const ocrOptions = document.getElementById('ocrOptions');
+    const geminiOptions = document.getElementById('geminiOptions');
+    const confidenceContainer = document.getElementById('confidenceContainer');
+    const confidenceText = document.getElementById('confidenceText');
+    const extractedTextHeader = document.getElementById('extractedTextHeader');
+    
+    // --- Inicialização ---
+    document.addEventListener('DOMContentLoaded', function() {
+      // Configurar o slider de temperatura
+      const temperatureSlider = document.getElementById('geminiTemperature');
+      const temperatureValue = document.getElementById('temperatureValue');
+      
+      temperatureSlider.addEventListener('input', function() {
+        const value = this.value / 100;
+        temperatureValue.textContent = value.toFixed(1);
+      });
+      
+      // Definir o modo inicial
+      setMode(currentMode);
+      
+      // Verificar se Tesseract está disponível
+      if (!window.Tesseract) {
+        const script = document.createElement('script');
+        script.src = "https://cdn.jsdelivr.net/npm/tesseract.js@v5.1.1/dist/tesseract.min.js";
+        document.head.appendChild(script);
+      }
+    });
+    
+    // --- Funções de modo ---
+    function setMode(mode) {
+      currentMode = mode;
+      
+      if (mode === 'ocr') {
+        ocrModeBtn.classList.add('active');
+        geminiModeBtn.classList.remove('active');
+        ocrOptions.style.display = 'block';
+        geminiOptions.style.display = 'none';
+        confidenceContainer.style.display = 'block';
+        confidenceText.style.display = 'block';
+        extractedTextHeader.textContent = 'Texto extraído (OCR):';
+      } else {
+        ocrModeBtn.classList.remove('active');
+        geminiModeBtn.classList.add('active');
+        ocrOptions.style.display = 'none';
+        geminiOptions.style.display = 'block';
+        confidenceContainer.style.display = 'none';
+        confidenceText.style.display = 'none';
+        extractedTextHeader.textContent = 'Texto interpretado (Gemini):';
+      }
+    }
     
     // Show image preview immediately when file is selected
     document.getElementById("imageInput").addEventListener("change", function() {
@@ -308,6 +415,17 @@
       }
     }
     
+    // Converter arquivo para base64
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = error => reject(error);
+      });
+    }
+    
+    // Aprimoramento de imagem para OCR
     function enhanceImageForOCR(imageData) {
       return new Promise((resolve) => {
         const img = new Image();
@@ -353,57 +471,81 @@
       });
     }
     
+    // Processar imagem (OCR ou Gemini)
     async function processImage(useExistingImage = false) {
       // Show loading state
       document.getElementById("loading").style.display = "block";
       document.getElementById("processButton").disabled = true;
       
-      let imageData;
-      if (useExistingImage && lastImageData) {
-        imageData = lastImageData;
-      } else {
-        const input = document.getElementById("imageInput");
-        const file = input.files[0];
-        if (!file) {
-          alert("Selecione uma imagem.");
-          document.getElementById("loading").style.display = "none";
-          document.getElementById("processButton").disabled = false;
-          return;
+      try {
+        // Obter dados da imagem
+        let imageData;
+        let file;
+        
+        if (useExistingImage && lastImageData) {
+          imageData = lastImageData;
+        } else {
+          const input = document.getElementById("imageInput");
+          file = input.files[0];
+          if (!file) {
+            alert("Selecione uma imagem.");
+            document.getElementById("loading").style.display = "none";
+            document.getElementById("processButton").disabled = false;
+            return;
+          }
+          
+          imageData = await fileToBase64(file);
+          lastImageData = imageData;
         }
         
-        const reader = new FileReader();
-        imageData = await new Promise((resolve) => {
-          reader.onload = e => resolve(e.target.result);
-          reader.readAsDataURL(file);
-        });
-        lastImageData = imageData;
+        // Escolher o método de processamento baseado no modo
+        if (currentMode === 'ocr') {
+          await processWithOCR(imageData, file);
+        } else {
+          await processWithGemini(imageData, file);
+        }
+      } catch (error) {
+        console.error("Erro ao processar imagem:", error);
+        alert("Erro ao processar imagem: " + error.message);
+        document.getElementById("loading").style.display = "none";
+        document.getElementById("processButton").disabled = false;
       }
-      
-      // Enhance image if option is checked
-      const useEnhancement = document.getElementById("useEnhancement").checked;
-      if (useEnhancement) {
-        try {
+    }
+    
+    // Processar com OCR (Tesseract)
+    async function processWithOCR(imageData, file) {
+      try {
+        // Verificar se Tesseract está disponível
+        if (!window.Tesseract) {
+          throw new Error("Biblioteca Tesseract.js não carregada. Recarregue a página ou mude para o modo Gemini.");
+        }
+        
+        // Enhance image if option is checked
+        const useEnhancement = document.getElementById("useEnhancement").checked;
+        if (useEnhancement) {
           document.getElementById("statusMessage").textContent = "Aprimorando imagem...";
           imageData = await enhanceImageForOCR(imageData);
-        } catch (error) {
-          console.error("Erro ao aprimorar imagem:", error);
         }
-      }
-      
-      // Get selected language
-      const language = document.getElementById("ocrEngine").value;
-      
-      // Run OCR with Tesseract.js
-      document.getElementById("statusMessage").textContent = "Reconhecendo texto...";
-      Tesseract.recognize(imageData, language, {
-        logger: m => {
-          console.log(m);
-          if (m.status === "recognizing text") {
-            document.getElementById("statusMessage").textContent = 
-              `Reconhecendo texto... ${Math.round(m.progress * 100)}%`;
+        
+        // Get selected language
+        const language = document.getElementById("ocrEngine").value;
+        
+        // Run OCR with Tesseract.js
+        document.getElementById("statusMessage").textContent = "Reconhecendo texto...";
+        const { data: { text, confidence: ocrConfidence } } = await Tesseract.recognize(
+          imageData, 
+          language, 
+          {
+            logger: m => {
+              console.log(m);
+              if (m.status === "recognizing text") {
+                document.getElementById("statusMessage").textContent = 
+                  `Reconhecendo texto... ${Math.round(m.progress * 100)}%`;
+              }
+            }
           }
-        }
-      }).then(({ data: { text, confidence: ocrConfidence } }) => {
+        );
+        
         // Update UI with results
         document.getElementById("rawText").innerText = text;
         rawText = text;
@@ -421,14 +563,151 @@
         document.getElementById("resultContainer").style.display = "block";
         document.getElementById("loading").style.display = "none";
         document.getElementById("processButton").disabled = false;
-      }).catch(err => {
+      } catch (err) {
         console.error(err);
-        alert("Erro ao processar imagem: " + err.message);
+        alert("Erro no processamento OCR: " + err.message);
         document.getElementById("loading").style.display = "none";
         document.getElementById("processButton").disabled = false;
-      });
+      }
+    }
+    
+    // Processar com Gemini
+    async function processWithGemini(imageData, file) {
+      try {
+        document.getElementById("statusMessage").textContent = "Enviando para Gemini...";
+        
+        // Obter opções do Gemini
+        const isDetailed = document.getElementById("geminiDetailed").checked;
+        const temperature = document.getElementById("geminiTemperature").value / 100;
+        
+        // Construir prompt para o Gemini
+        const promptParaGemini = isDetailed ?
+          `Analise cuidadosamente esta imagem de um cartaz/flyer de evento musical e extraia as seguintes informações em formato JSON:
+          - atracao: nome da atração musical ou artista principal
+          - data: data do evento (se disponível)
+          - hora: horário do evento em formato HH:MM
+          - local: nome do local do evento
+          - endereco: endereço completo (quando disponível)
+          - bairro: bairro do evento (quando disponível)
+          - tipo: tipo do evento (show, lançamento de CD, etc.)
+          - cd: nome do CD sendo lançado (se for um lançamento)
+          
+          Mesmo que a imagem seja de baixa qualidade ou com texto parcialmente legível, tente extrair o máximo de informações.
+          Se não conseguir identificar com certeza algum dado, informe uma aproximação baseada no contexto.
+          
+          Retorne sua análise no seguinte formato:
+          1. Um breve texto explicando o que identificou na imagem
+          2. Um objeto JSON com as informações extraídas.
+          
+          No objeto JSON, inclua apenas os campos que você conseguiu identificar com razoável certeza.` :
+          
+          `Analise esta imagem de um cartaz de evento musical e extraia as principais informações (artista, data, hora, local) em formato JSON.
+          Retorne APENAS um objeto JSON sem explicações adicionais.`;
+        
+        // Chamar a API Gemini com suporte a imagem
+        const geminiUrl = `${GEMINI_API_BASE_URL}${GEMINI_MODEL_ID}:generateContent?key=${GEMINI_API_KEY}`;
+        const requestBody = {
+          contents: [{
+            role: 'user',
+            parts: [
+              { text: promptParaGemini },
+              { inline_data: {
+                  mime_type: file ? file.type : 'image/jpeg',
+                  data: imageData.split(',')[1]
+                }
+              }
+            ]
+          }],
+          generationConfig: { 
+            temperature: temperature,
+            maxOutputTokens: 1000
+          }
+        };
+
+        const responseGemini = await fetch(geminiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
+        });
+        
+        if (!responseGemini.ok) {
+          let errorMsg = `Erro na API do Gemini: ${responseGemini.status}`;
+          try {
+            const errorData = await responseGemini.json();
+            errorMsg += ` - ${errorData.error?.message ?? 'Detalhes indisponíveis'}`;
+          } catch (parseError) { /* Ignora erro de parse do erro */ }
+          throw new Error(errorMsg);
+        }
+        
+        const dadosGemini = await responseGemini.json();
+        const textoGerado = dadosGemini?.candidates?.[0]?.content?.parts?.[0]?.text;
+        
+        if (!textoGerado) {
+          throw new Error("Resposta vazia do Gemini");
+        }
+        
+        // Extrair o texto e o JSON da resposta
+        document.getElementById("rawText").innerText = textoGerado;
+        rawText = textoGerado;
+        
+        // Tentar extrair o JSON da resposta
+        let eventoJSON = null;
+        
+        // Verificar se há um bloco JSON na resposta
+        const jsonMatch = textoGerado.match(/```json\n([\s\S]*?)\n```/) || 
+                         textoGerado.match(/{[\s\S]*?}/);
+                         
+        if (jsonMatch) {
+          try {
+            const jsonText = jsonMatch[1] || jsonMatch[0];
+            eventoJSON = JSON.parse(jsonText.replace(/^\s*```[a-z]*\s*|\s*```\s*$/g, ''));
+          } catch (e) {
+            console.warn("Erro ao parsear JSON do Gemini:", e);
+          }
+        }
+        
+        // Se não conseguiu extrair o JSON, tentar analisar o texto inteiro como JSON
+        if (!eventoJSON) {
+          try {
+            // Limpeza básica: remover backticks e indicadores de json, depois tentar parsear
+            const cleanText = textoGerado.replace(/```json|```/g, '').trim();
+            eventoJSON = JSON.parse(cleanText);
+          } catch (e) {
+            console.warn("Tentativa secundária falhou:", e);
+            
+            // Como último recurso, procurar por chaves { } no texto
+            const lastAttempt = textoGerado.match(/{[\s\S]*}/);
+            if (lastAttempt) {
+              try {
+                eventoJSON = JSON.parse(lastAttempt[0]);
+              } catch (e) {
+                console.warn("Última tentativa falhou:", e);
+              }
+            }
+          }
+        }
+        
+        // Definir o resultado
+        if (eventoJSON) {
+          evento = eventoJSON;
+          document.getElementById("parsedData").innerText = JSON.stringify(evento, null, 2);
+        } else {
+          document.getElementById("parsedData").innerText = "Não foi possível extrair um objeto JSON estruturado da resposta.";
+        }
+        
+        // Show results and hide loading
+        document.getElementById("resultContainer").style.display = "block";
+        document.getElementById("loading").style.display = "none";
+        document.getElementById("processButton").disabled = false;
+      } catch (err) {
+        console.error(err);
+        alert("Erro no processamento com Gemini: " + err.message);
+        document.getElementById("loading").style.display = "none";
+        document.getElementById("processButton").disabled = false;
+      }
     }
 
+    // Analisar texto para extrair informações do evento (usando OCR)
     function parseEvento(texto) {
       const evento = {};
 
@@ -572,7 +851,7 @@
           evento.cd = cdNameMatch[1].trim();
         } else {
           // Try to extract the CD name from the context
-          const constantMotionMatch = texto.match(/CONSTANT\s+MOTION/i);
+          const constantMotionMatch = texto.match(/CONSTANT\s*MOTION/i);
           if (constantMotionMatch) {
             evento.cd = "CONSTANT MOTION";
           }
@@ -597,8 +876,13 @@
       return evento;
     }
 
+    // Enviar evento para a API
     function enviarEvento() {
-      if (!evento.atracao) return alert("Nenhum evento detectado ainda.");
+      if (!evento || !evento.atracao) {
+        alert("Nenhum evento detectado ainda.");
+        return;
+      }
+      
       fetch("https://sua-api.com/eventos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

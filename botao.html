@@ -1,0 +1,715 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consultas com Gemini</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            line-height: 1.6;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        .container {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-width: 600px;
+            margin: 40px auto;
+            text-align: center;
+        }
+        .buttons-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        button {
+            padding: 12px 25px;
+            font-size: 16px;
+            cursor: pointer;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+            margin: 5px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        #climaBtn {
+            background-color: #007bff;
+        }
+        #climaBtn:hover {
+            background-color: #0056b3;
+        }
+        #maresBtn {
+            background-color: #17a2b8;
+        }
+        #maresBtn:hover {
+            background-color: #138496;
+        }
+        #filmeBtn {
+            background-color: #e83e8c;
+        }
+        #filmeBtn:hover {
+            background-color: #d6246b;
+        }
+        #resultado {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #eee;
+            border-radius: 5px;
+            background-color: #e9ecef;
+            min-height: 50px;
+            text-align: left;
+        }
+        .loading {
+            font-style: italic;
+            color: #555;
+        }
+        .error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .button-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        #speakBtn {
+            background-color: #28a745;
+        }
+        #speakBtn:hover {
+            background-color: #218838;
+        }
+        #stopSpeakBtn {
+            background-color: #dc3545;
+        }
+        #stopSpeakBtn:hover {
+            background-color: #c82333;
+        }
+        .audio-controls {
+            margin-top: 15px;
+            display: none;
+        }
+        /* Ícones embutidos como Unicode */
+        .icon {
+            font-size: 1.2em;
+        }
+        /* Filme card */
+        .filme-card {
+            display: none;
+            margin-top: 20px;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .filme-poster {
+            width: 100%;
+            max-height: 300px;
+            object-fit: cover;
+        }
+        .filme-info {
+            padding: 15px;
+            background-color: #fff;
+        }
+        .filme-titulo {
+            margin-top: 0;
+            color: #333;
+            font-size: 1.5rem;
+        }
+        .filme-detalhes {
+            margin: 10px 0;
+            color: #666;
+        }
+        .filme-classificacao {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 3px;
+            color: white;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .livre { background-color: #28a745; }
+        .dez { background-color: #007bff; }
+        .doze { background-color: #ffc107; color: #333; }
+        .quatorze { background-color: #ff7f00; }
+        .dezesseis { background-color: #dc3545; }
+        .dezoito { background-color: #343a40; }
+        .estreia {
+            display: inline-block;
+            margin-left: 10px;
+            padding: 3px 8px;
+            background-color: #fd7e14;
+            color: white;
+            border-radius: 3px;
+            font-size: 0.8em;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Consultas com Gemini</h1>
+    <p>Clique em um dos botões para obter um resumo gerado pelo Gemini.</p>
+
+    <div class="buttons-container">
+        <button id="climaBtn"><span class="icon">🌤️</span> Ver Clima Atual</button>
+        <button id="maresBtn"><span class="icon">🌊</span> Ver Marés Atuais</button>
+        <button id="filmeBtn"><span class="icon">🎬</span> Sugerir Filme</button>
+    </div>
+
+    <div id="resultado">
+        Clique em um dos botões acima para ver o resultado.
+    </div>
+    
+    <div id="filmeCard" class="filme-card">
+        <!-- Conteúdo do card de filme será inserido dinamicamente -->
+    </div>
+
+    <div class="audio-controls" id="audioControls">
+        <div class="button-container">
+            <button id="speakBtn" title="Ouvir resumo"><span class="icon">🔊</span> Ouvir</button>
+            <button id="stopSpeakBtn" title="Parar áudio"><span class="icon">🛑</span> Parar</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- Configuração ---
+    const WEATHER_API_URL = 'https://clima.mosaicoworkers.workers.dev/';
+    const TIDES_API_URL = 'https://mares.mosaicoworkers.workers.dev/';
+    const MOVIES_API_URL = 'https://cinema.mosaicoworkers.workers.dev/v0/templates/nowplaying/32?partnership=marcotulio';
+    
+    // !!! CUIDADO EXTREMO: NUNCA coloque sua chave de API diretamente no código frontend em produção !!!
+    //     Isto é APENAS para teste local e demonstração. Qualquer pessoa pode ver esta chave.
+    //     Para produção, use um backend para proteger sua chave.
+    const GEMINI_API_KEY = "AIzaSyAQR7qRaUJ6wpEq_RrGSUzodbkmVbz7Gdk"; // <= SUBSTITUA PELA SUA CHAVE
+    const GEMINI_MODEL_ID = "gemini-1.5-flash-latest"; // Modelo a ser usado
+    const GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
+
+    // --- Elementos DOM ---
+    const climaButton = document.getElementById('climaBtn');
+    const maresButton = document.getElementById('maresBtn');
+    const filmeButton = document.getElementById('filmeBtn');
+    const resultadoDiv = document.getElementById('resultado');
+    const filmeCard = document.getElementById('filmeCard');
+    const speakButton = document.getElementById('speakBtn');
+    const stopSpeakButton = document.getElementById('stopSpeakBtn');
+    const audioControls = document.getElementById('audioControls');
+
+    // --- Variáveis globais ---
+    let currentText = '';
+    let isSpeaking = false;
+    let currentMovie = null;
+
+    // --- Verificar suporte à síntese de voz ---
+    const speechSynthesisSupported = 'speechSynthesis' in window;
+    
+    // --- Configuração de síntese de voz ---
+    let synth = window.speechSynthesis;
+    let utterance = null;
+
+    // --- Função para obter a classe CSS baseada na classificação do filme ---
+    function getClassificacaoClass(classificacao) {
+        switch (classificacao) {
+            case 'Livre': return 'livre';
+            case '10 anos': return 'dez';
+            case '12 anos': return 'doze';
+            case '14 anos': return 'quatorze';
+            case '16 anos': return 'dezesseis';
+            case '18 anos': return 'dezoito';
+            default: return 'livre';
+        }
+    }
+
+    // --- Funções para controle de voz ---
+    function speakText(text) {
+        if (!speechSynthesisSupported) {
+            alert('Seu navegador não suporta síntese de voz.');
+            return;
+        }
+        
+        // Parar qualquer fala em andamento
+        if (synth.speaking) {
+            synth.cancel();
+        }
+        
+        // Criar nova instância de fala
+        utterance = new SpeechSynthesisUtterance(text);
+        
+        // Configurar voz em português
+        utterance.lang = 'pt-BR';
+        
+        // Eventos
+        utterance.onstart = function() {
+            isSpeaking = true;
+            speakButton.disabled = true;
+        };
+        
+        utterance.onend = function() {
+            isSpeaking = false;
+            speakButton.disabled = false;
+        };
+        
+        utterance.onerror = function(event) {
+            console.error('Erro de síntese de voz:', event);
+            isSpeaking = false;
+            speakButton.disabled = false;
+        };
+        
+        // Iniciar fala
+        synth.speak(utterance);
+    }
+    
+    function stopSpeaking() {
+        if (speechSynthesisSupported && synth.speaking) {
+            synth.cancel();
+            isSpeaking = false;
+            speakButton.disabled = false;
+        }
+    }
+
+    // --- Função para buscar dados e gerar resumo com Gemini ---
+    async function consultarGemini(apiUrl, promptGenerator, serviceName) {
+        // 1. Desabilitar botões e mostrar loading
+        climaButton.disabled = true;
+        maresButton.disabled = true;
+        filmeButton.disabled = true;
+        resultadoDiv.innerHTML = `<div class="loading">Buscando dados de ${serviceName}...</div>`;
+        
+        // Esconder controles de áudio enquanto carrega novos dados
+        audioControls.style.display = 'none';
+        filmeCard.style.display = 'none';
+        
+        // Parar qualquer fala em andamento
+        stopSpeaking();
+
+        try {
+            // 2. Buscar dados da API
+            const response = await fetch(apiUrl);
+            if (!response.ok) {
+                throw new Error(`Erro ao buscar dados: ${response.status} ${response.statusText}`);
+            }
+            
+            const dados = await response.json();
+            resultadoDiv.innerHTML = '<div class="loading">Dados obtidos. Solicitando resumo ao Gemini...</div>';
+
+            // 3. Construir o Prompt para o Gemini usando a função geradora de prompt
+            const promptParaGemini = promptGenerator(dados);
+
+            // 4. Preparar a Requisição para o Gemini
+            const geminiUrl = `${GEMINI_API_BASE_URL}${GEMINI_MODEL_ID}:generateContent?key=${GEMINI_API_KEY}`;
+            const requestBody = {
+                contents: [{
+                    role: 'user',
+                    parts: [{ text: promptParaGemini }]
+                }],
+                // Configurações para melhorar a geração
+                generationConfig: { 
+                    temperature: 0.7,
+                    maxOutputTokens: 800
+                }
+            };
+
+            // 5. Chamar a API do Gemini
+            const responseGemini = await fetch(geminiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!responseGemini.ok) {
+                let errorMsg = `Erro na API do Gemini: ${responseGemini.status} ${responseGemini.statusText}`;
+                try {
+                    const errorData = await responseGemini.json();
+                    errorMsg += ` - ${errorData.error?.message ?? 'Detalhes indisponíveis'}`;
+                } catch (parseError) { /* Ignora erro de parse do erro */ }
+                throw new Error(errorMsg);
+            }
+
+            const dadosGemini = await responseGemini.json();
+
+            // 6. Extrair e exibir o resultado
+            const textoGerado = dadosGemini?.candidates?.[0]?.content?.parts?.[0]?.text;
+
+            if (textoGerado) {
+                resultadoDiv.textContent = textoGerado; // Usar textContent para segurança
+                currentText = textoGerado; // Armazenar o texto para uso com o sistema de voz
+                
+                // Mostrar controles de áudio se a síntese de voz for suportada
+                if (speechSynthesisSupported) {
+                    audioControls.style.display = 'block';
+                }
+                
+                // Se for uma sugestão de filme, mostra o card do filme
+                if (currentMovie) {
+                    exibirCardFilme(currentMovie);
+                }
+            } else {
+                // Lidar com casos onde a resposta é válida mas não tem texto (ex: bloqueado)
+                const blockReason = dadosGemini?.promptFeedback?.blockReason;
+                if (blockReason) {
+                    resultadoDiv.innerHTML = `<div class="error">Conteúdo bloqueado pela API do Gemini. Motivo: ${blockReason}</div>`;
+                } else {
+                    resultadoDiv.innerHTML = `<div class="error">Resposta inesperada da API do Gemini. Nenhum texto gerado.</div>`;
+                    console.warn("Resposta Gemini inesperada:", dadosGemini);
+                }
+                
+                // Esconder controles de áudio se não houver texto para falar
+                audioControls.style.display = 'none';
+                filmeCard.style.display = 'none';
+            }
+
+        } catch (error) {
+            console.error("Erro:", error);
+            resultadoDiv.innerHTML = `<div class="error">Falha: ${error.message}</div>`;
+            audioControls.style.display = 'none'; // Esconder controles de áudio em caso de erro
+            filmeCard.style.display = 'none';
+        } finally {
+            // 7. Reabilitar os botões
+            climaButton.disabled = false;
+            maresButton.disabled = false;
+            filmeButton.disabled = false;
+        }
+    }
+
+    // --- Função para gerar o prompt de clima ---
+    function gerarPromptClima(dados) {
+        // Verificação mais robusta da estrutura de dados
+        let temp = 'N/A';
+        let desc = 'N/A';
+        let uv = 'N/A';
+        let aqi = 'N/A';
+        
+        // Extrai informações com segurança
+        if (dados && typeof dados === 'object') {
+            temp = dados.current?.temperature ?? 'N/A';
+            desc = dados.current?.weather_description ?? 'N/A';
+            uv = dados.air_quality?.uv_category ?? 'N/A';
+            aqi = dados.air_quality?.aqi_category ?? 'N/A';
+        }
+
+        return `Com base nos seguintes dados meteorológicos atuais para João Pessoa: 
+        Temperatura=${temp}°C, 
+        Condição='${desc}', 
+        Índice UV='${uv}', 
+        Qualidade do Ar='${aqi}'. 
+        
+        Por favor, gere um resumo conciso e em linguagem natural para um usuário. 
+        Comece com "A temperatura atual em João Pessoa é de..." e inclua uma recomendação 
+        baseada nas condições atuais (se deve usar protetor solar, levar guarda-chuva, etc.).`;
+    }
+
+    // --- Função para gerar o prompt de marés ---
+    function gerarPromptMares(dados) {
+        const nivelAtual = dados.current?.level.toFixed(2) ?? 'N/A';
+        
+        // Encontra a próxima maré
+        let proximaMare = "não disponível";
+        let tipoProximaMare = "";
+        
+        // Organiza todas as marés por dia e horário
+        const hoje = dados.current?.date;
+        if (hoje && dados.tidesByDay && dados.tidesByDay[hoje]) {
+            const maresDoDia = [...dados.tidesByDay[hoje]];
+            maresDoDia.sort((a, b) => a.time.localeCompare(b.time));
+            
+            // Encontra a próxima maré após a hora atual
+            const horaAtual = dados.current?.time;
+            const proximaMareDoDia = maresDoDia.find(mare => mare.time > horaAtual);
+            
+            if (proximaMareDoDia) {
+                proximaMare = `${proximaMareDoDia.time} com altura de ${proximaMareDoDia.height}`;
+                tipoProximaMare = proximaMareDoDia.high ? "alta" : "baixa";
+            }
+        }
+        
+        // Fase da lua
+        const faseLua = dados.moon?.simplified ?? "não disponível";
+        
+        return `Com base nos seguintes dados de marés para João Pessoa:
+        Nível atual da maré: ${nivelAtual} metros
+        Próxima maré ${tipoProximaMare}: ${proximaMare}
+        Fase da Lua: ${faseLua}
+        
+        Por favor, gere um resumo conciso em linguagem natural para um usuário sobre as 
+        condições atuais das marés. Inclua uma recomendação baseada no nível atual e na 
+        previsão da próxima maré (se é bom para nadar, pescar, etc.). 
+        Comece com "O nível atual da maré em João Pessoa é de..." e explique de forma 
+        simples o que isso significa para atividades na praia.`;
+    }
+    
+    // --- Função para verificar se o filme já está em cartaz ---
+    function isMovieCurrentlyPlaying(movie) {
+        // Obter a data atual
+        const hoje = new Date();
+        
+        // Obter a data de estreia do filme (se existir)
+        if (movie.premiereDate && movie.premiereDate.localDate) {
+            const dataEstreiaStr = movie.premiereDate.localDate;
+            const dataEstreia = new Date(dataEstreiaStr);
+            
+            // Comparar as datas - o filme está em cartaz se a data de estreia for anterior ou igual a hoje
+            return dataEstreia <= hoje;
+        }
+        
+        // Se não tiver data de estreia ou o campo estiver vazio, assume que está em cartaz
+        return true;
+    }
+    
+    // --- Função para gerar o prompt de filmes ---
+    function gerarPromptFilme(dados) {
+        // Reset do filme atual
+        currentMovie = null;
+        
+        // Verifica se temos filmes válidos
+        if (!dados || !Array.isArray(dados) || dados.length === 0) {
+            return "Por favor, recomende um filme que esteja em cartaz em João Pessoa. Inclua um breve resumo e para qual tipo de público seria adequado.";
+        }
+        
+        // Filtra apenas filmes que já estão em cartaz (data de estreia <= hoje)
+        const filmesEmCartaz = dados.filter(filme => isMovieCurrentlyPlaying(filme));
+        
+        if (filmesEmCartaz.length === 0) {
+            return "Por favor, recomende um filme que esteja em cartaz em João Pessoa. Inclua um breve resumo e para qual tipo de público seria adequado.";
+        }
+        
+        // Seleciona um filme aleatório com sinopse válida
+        const filmesComSinopse = filmesEmCartaz.filter(filme => filme.synopsis && filme.synopsis.trim() !== '');
+        
+        // Se não houver filmes com sinopse, seleciona qualquer filme
+        const filmes = filmesComSinopse.length > 0 ? filmesComSinopse : filmesEmCartaz;
+        const indiceAleatorio = Math.floor(Math.random() * filmes.length);
+        const filmeEscolhido = filmes[indiceAleatorio];
+        
+        // Armazena o filme escolhido para exibição posterior
+        currentMovie = filmeEscolhido;
+        
+        // Extrai informações do filme
+        const titulo = filmeEscolhido.title || 'Título não disponível';
+        const tituloOriginal = filmeEscolhido.originalTitle || titulo;
+        const sinopse = filmeEscolhido.synopsis || 'Sinopse não disponível';
+        const classificacao = filmeEscolhido.contentRating || 'Classificação não disponível';
+        const generos = filmeEscolhido.genres?.join(', ') || 'Gêneros não disponíveis';
+        const duracao = filmeEscolhido.duration ? `${filmeEscolhido.duration} minutos` : 'Duração não disponível';
+        
+        // Informação sobre data de estreia
+        const dataEstreia = filmeEscolhido.premiereDate?.dayAndMonth || 'Data não disponível';
+        const anoEstreia = filmeEscolhido.premiereDate?.year || 'Ano não disponível';
+        
+        return `Você é um assistente útil que DEVE recomendar o filme a seguir:
+
+Filme: "${titulo}"
+Título Original: "${tituloOriginal}"
+Classificação: ${classificacao}
+Gêneros: ${generos}
+Duração: ${duracao}
+Estreia: ${dataEstreia}/${anoEstreia}
+Sinopse: "${sinopse}"
+
+Este filme está em cartaz AGORA em João Pessoa. Por favor, crie uma recomendação personalizada para este filme específico, como se estivesse sugerindo a um amigo assistir ao filme. 
+
+Sua resposta DEVE incluir:
+1. Uma introdução entusiástica como "Que tal assistir '${titulo}'?"
+2. Um breve resumo da trama sem revelar spoilers
+3. Para qual tipo de público o filme é mais adequado
+4. O que torna este filme interessante ou especial
+
+Sua recomendação deve ser conversacional, entusiasmada e persuasiva, mostrando conhecimento sobre o filme mencionado.`;
+    }
+    
+    // --- Função para exibir o card do filme ---
+    function exibirCardFilme(filme) {
+        if (!filme) return;
+        
+        // Encontra a imagem do poster
+        const posterImage = filme.images?.find(img => img.type === "PosterPortrait");
+        const posterUrl = posterImage ? posterImage.url : '';
+        
+        // Cria o HTML do card
+        const classificacaoClass = getClassificacaoClass(filme.contentRating);
+        
+        // Verifica se é um lançamento recente (últimos 7 dias)
+        let badgeEstreia = '';
+        if (filme.premiereDate && filme.premiereDate.localDate) {
+            const dataEstreia = new Date(filme.premiereDate.localDate);
+            const hoje = new Date();
+            const diffDias = Math.floor((hoje - dataEstreia) / (1000 * 60 * 60 * 24));
+            
+            if (diffDias <= 7 && diffDias >= 0) {
+                badgeEstreia = '<span class="estreia">Lançamento</span>';
+            }
+        }
+        
+        let cardHTML = `
+            <img src="${posterUrl}" alt="${filme.title}" class="filme-poster">
+            <div class="filme-info">
+                <h3 class="filme-titulo">${filme.title} ${badgeEstreia}</h3>
+                <div class="filme-detalhes">
+                    <span class="filme-classificacao ${classificacaoClass}">${filme.contentRating}</span>
+                    ${filme.genres?.join(', ') || ''} - ${filme.duration} min
+                </div>
+            </div>
+        `;
+        
+        // Atualiza o card e o exibe
+        filmeCard.innerHTML = cardHTML;
+        filmeCard.style.display = 'block';
+    }
+
+    // --- Funções específicas para cada botão ---
+    async function obterResumoClima() {
+        try {
+            // Reset de qualquer filme anterior
+            currentMovie = null;
+            filmeCard.style.display = 'none';
+            
+            // Desabilitar botões e mostrar loading
+            climaButton.disabled = true;
+            maresButton.disabled = true;
+            filmeButton.disabled = true;
+            resultadoDiv.innerHTML = '<div class="loading">Buscando dados de clima...</div>';
+            
+            // Esconder controles de áudio enquanto carrega novos dados
+            audioControls.style.display = 'none';
+            
+            // Parar qualquer fala em andamento
+            stopSpeaking();
+            
+            // Buscar dados - PRIMEIRO teste com catch para verificar se a API está respondendo
+            let dados;
+            try {
+                const response = await fetch(WEATHER_API_URL);
+                if (!response.ok) {
+                    throw new Error(`Erro ao buscar dados: ${response.status} ${response.statusText}`);
+                }
+                dados = await response.json();
+            } catch (apiError) {
+                console.error("Erro na API de clima:", apiError);
+                
+                // Dados de clima fake para continuar o fluxo
+                dados = {
+                    current: {
+                        temperature: 28,
+                        weather_description: "Parcialmente nublado"
+                    },
+                    air_quality: {
+                        uv_category: "Alto",
+                        aqi_category: "Bom"
+                    }
+                };
+                
+                // Notificar o usuário, mas continuar
+                resultadoDiv.innerHTML = `<div class="loading">API de clima indisponível. Usando dados de exemplo...</div>`;
+            }
+            
+            // O resto do fluxo continua com os dados reais ou os dados fake
+            const promptParaGemini = gerarPromptClima(dados);
+            resultadoDiv.innerHTML = '<div class="loading">Solicitando resumo ao Gemini...</div>';
+            
+            // 4. Preparar a Requisição para o Gemini
+            const geminiUrl = `${GEMINI_API_BASE_URL}${GEMINI_MODEL_ID}:generateContent?key=${GEMINI_API_KEY}`;
+            const requestBody = {
+                contents: [{
+                    role: 'user',
+                    parts: [{ text: promptParaGemini }]
+                }],
+                generationConfig: { 
+                    temperature: 0.7,
+                    maxOutputTokens: 800
+                }
+            };
+            
+            // 5. Chamar a API do Gemini
+            const responseGemini = await fetch(geminiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(requestBody)
+            });
+            
+            if (!responseGemini.ok) {
+                let errorMsg = `Erro na API do Gemini: ${responseGemini.status} ${responseGemini.statusText}`;
+                try {
+                    const errorData = await responseGemini.json();
+                    errorMsg += ` - ${errorData.error?.message ?? 'Detalhes indisponíveis'}`;
+                } catch (parseError) { /* Ignora erro de parse do erro */ }
+                throw new Error(errorMsg);
+            }
+            
+            const dadosGemini = await responseGemini.json();
+            
+            // 6. Extrair e exibir o resultado
+            const textoGerado = dadosGemini?.candidates?.[0]?.content?.parts?.[0]?.text;
+            
+            if (textoGerado) {
+                resultadoDiv.textContent = textoGerado;
+                currentText = textoGerado;
+                
+                // Mostrar controles de áudio se a síntese de voz for suportada
+                if (speechSynthesisSupported) {
+                    audioControls.style.display = 'block';
+                }
+            } else {
+                resultadoDiv.innerHTML = `<div class="error">Resposta inesperada da API do Gemini. Nenhum texto gerado.</div>`;
+                audioControls.style.display = 'none';
+            }
+        } catch (error) {
+            console.error("Erro geral:", error);
+            resultadoDiv.innerHTML = `<div class="error">Falha: ${error.message}</div>`;
+            audioControls.style.display = 'none';
+        } finally {
+            // Reabilitar os botões
+            climaButton.disabled = false;
+            maresButton.disabled = false;
+            filmeButton.disabled = false;
+        }
+    }
+    
+    async function obterResumoMares() {
+        // Reset de qualquer filme anterior
+        currentMovie = null;
+        filmeCard.style.display = 'none';
+        
+        await consultarGemini(TIDES_API_URL, gerarPromptMares, "marés");
+    }
+    
+    async function obterSugestaoFilme() {
+        await consultarGemini(MOVIES_API_URL, gerarPromptFilme, "filmes");
+    }
+
+    // --- Adicionar Event Listeners ---
+    climaButton.addEventListener('click', obterResumoClima);
+    maresButton.addEventListener('click', obterResumoMares);
+    filmeButton.addEventListener('click', obterSugestaoFilme);
+    
+    // Event Listeners para controles de áudio
+    speakButton.addEventListener('click', function() {
+        if (currentText) {
+            speakText(currentText);
+        }
+    });
+    
+    stopSpeakButton.addEventListener('click', stopSpeaking);
+
+    // Limpar a fala ao sair da página
+    window.addEventListener('beforeunload', function() {
+        if (speechSynthesisSupported && synth.speaking) {
+            synth.cancel();
+        }
+    });
+</script>
+
+</body>
+</html>
