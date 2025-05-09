@@ -1,6 +1,6 @@
 # Mini Agente de Eventos
 
-![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)
+![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)
 ![Status](https://img.shields.io/badge/status-active-success.svg)
 
 > Um aplicativo web para extrair automaticamente informações de pôsteres de eventos culturais usando OCR (Reconhecimento Óptico de Caracteres) ou IA Generativa (Google Gemini).
@@ -32,6 +32,9 @@ O **Mini Agente de Eventos** é uma aplicação web projetada para extrair infor
 - 🤖 **Análise com IA Generativa**: Processamento avançado com Google Gemini
 - 📊 **Medidor de Confiança**: Visualização da precisão do reconhecimento (modo OCR)
 - 🔧 **Opções Avançadas**: Configurações personalizadas para cada método
+- 🎯 **Detecção de Múltiplos Eventos**: Identificação de vários eventos em um único cartaz (modo Gemini)
+- 🎨 **Interface de Cards**: Visualização clara dos eventos com cards interativos (modo Gemini)
+- ✏️ **Edição de Eventos**: Edição fácil dos dados extraídos antes do envio
 
 ## 🛠️ Tecnologias Utilizadas <a name="tecnologias"></a>
 
@@ -61,15 +64,19 @@ O **Mini Agente de Eventos** é uma aplicação web projetada para extrair infor
 
 ## 🏁 Como Usar <a name="como-usar"></a>
 
-1. Abra uma das versões da aplicação no navegador (`index.html` ou `index-gemini.html`)
-2. Selecione o modo de processamento desejado (OCR ou Gemini)
+1. Abra a página inicial (`escolha.html`) para selecionar o método de processamento
+2. Escolha entre OCR tradicional ou Gemini AI
 3. Clique em "Escolher imagem de evento" para selecionar um cartaz ou flyer
 4. A imagem será exibida automaticamente após a seleção
 5. Clique em "Extrair Evento" para iniciar o processamento
 6. Após o processamento, você verá:
-   - O texto extraído da imagem
-   - As informações do evento estruturadas em formato JSON
-7. Clique em "Enviar para API" para enviar os dados do evento (se aplicável)
+   - O texto extraído ou interpretado da imagem
+   - As informações do(s) evento(s) estruturadas
+   - No modo Gemini: múltiplos eventos detectados em cards selecionáveis
+7. No modo Gemini, você pode:
+   - Editar qualquer evento detectado
+   - Selecionar quais eventos deseja enviar
+8. Clique em "Enviar para API" para enviar os dados do(s) evento(s) selecionado(s)
 
 ## 🔄 Versões Disponíveis <a name="versões"></a>
 
@@ -82,6 +89,9 @@ O **Mini Agente de Eventos** é uma aplicação web projetada para extrair infor
 ### index-gemini.html - Versão Gemini
 - Usa a API Google Gemini para análise avançada das imagens
 - Interpretação mais inteligente e contextual
+- **Detecta múltiplos eventos em um único cartaz/imagem**
+- Interface com cards de eventos para melhor visualização
+- Permite edição e seleção de eventos antes do envio
 - Melhor para cartazes com layouts complexos ou texto de difícil leitura
 - Requer uma chave de API do Google AI Studio
 
