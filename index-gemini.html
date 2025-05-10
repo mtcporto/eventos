@@ -296,6 +296,8 @@
       <a href="escolha.html" style="color: var(--primary); font-size: 0.9em; text-decoration: none;">← Voltar para escolha</a>
       <span style="margin: 0 10px;">|</span>
       <a href="index.html" style="color: var(--primary); font-size: 0.9em; text-decoration: none;">Alternar para modo OCR →</a>
+      <span style="margin: 0 10px;">|</span>
+      <a href="eventos_view.html" style="color: var(--primary); font-size: 0.9em; text-decoration: none;">Ver todos os eventos →</a>
     </div>
     
     <div class="input-area">
@@ -304,10 +306,9 @@
         <input class="file-input" type="file" accept="image/*" id="imageInput" />
       </div>
       
-      <div class="simple-option">
-        <input type="checkbox" id="detailedAnalysis" checked>
-        <label for="detailedAnalysis">Análise detalhada</label>
-      </div>
+      <p style="text-align: center; margin: 10px 0; color: #666;">
+        <i>Você também pode colar uma imagem diretamente da área de transferência (Ctrl+V)</i>
+      </p>
     </div>
     
     <div class="preview-container">
@@ -373,6 +374,32 @@
       document.getElementById("resultContainer").style.display = "none";
     });
     
+    // Adicionar suporte para colar imagem da área de transferência
+    document.addEventListener('paste', function(event) {
+      const items = (event.clipboardData || event.originalEvent.clipboardData).items;
+      
+      for (const item of items) {
+        if (item.type.indexOf('image') === 0) {
+          const blob = item.getAsFile();
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            const preview = document.getElementById("preview");
+            preview.src = e.target.result;
+            preview.style.display = "block"; // Mostrar imagem quando colada
+            lastImageData = e.target.result;
+            
+            // Esconder resultados anteriores
+            document.getElementById("resultContainer").style.display = "none";
+            
+            // Opcional: Informar ao usuário que a imagem foi colada
+            alert("Imagem colada com sucesso! Clique em 'Extrair Evento' para processar.");
+          };
+          reader.readAsDataURL(blob);
+          break;
+        }
+      }
+    });
+    
     // Converter arquivo para base64
     function fileToBase64(file) {
       return new Promise((resolve, reject) => {
@@ -393,50 +420,55 @@
         // Obter dados da imagem
         const input = document.getElementById("imageInput");
         const file = input.files[0];
-        if (!file) {
-          alert("Selecione uma imagem.");
+        if (!file && !lastImageData) {
+          alert("Selecione uma imagem ou cole uma imagem da área de transferência.");
           document.getElementById("loading").style.display = "none";
           document.getElementById("processButton").disabled = false;
           return;
         }
         
-        const imageData = await fileToBase64(file);
+        let imageData;
+        if (file) {
+          imageData = await fileToBase64(file);
+        } else if (lastImageData) {
+          imageData = lastImageData;
+        }
+        
         document.getElementById("statusMessage").textContent = "Enviando para Gemini...";
         
-        // Verificar se a análise detalhada está habilitada
-        const isDetailed = document.getElementById("detailedAnalysis").checked;
-        
-        // Construir prompt para o Gemini - agora com suporte para múltiplos eventos
+        // Construir prompt para o Gemini com análise detalhada sempre ativada
         const promptParaGemini = `
           Analise esta imagem de um cartaz/flyer de evento(s) e extraia todos os eventos mencionados.
           
-          ${isDetailed ? `Preste atenção aos seguintes detalhes:
+          Preste atenção aos seguintes detalhes:
           - A imagem pode conter um ou vários eventos diferentes
           - Cada evento deve ter: atração principal, data, hora e local
           - Alguns eventos podem ter informações adicionais como preço, tipo de evento, etc.
           - Se houver apenas um evento, identifique-o normalmente
-          - Se houver múltiplos eventos, liste cada um separadamente` : ''}
+          - Se houver múltiplos eventos, liste cada um separadamente
+          - IMPORTANTE: Estamos no ano de 2025. Todos os eventos devem ocorrer em 2025 ou anos futuros, nunca no passado.
+          - Se a data estiver no formato DD/MM sem ano, considere que é 2025.
           
           Para cada evento identificado, extraia:
           - atracao: nome da atração musical, artista ou título do evento
-          - data: data do evento no formato DD/MM/AAAA
+          - data: data do evento no formato DD/MM/2025
           - hora: horário de início no formato HH:MM
           - local: nome do local/estabelecimento onde ocorrerá
           - cidade: cidade onde ocorrerá (se não for especificado, use "João Pessoa")
           - fonte: nome do estabelecimento que está promovendo o evento
           
-          ${isDetailed ? `Se disponível, também extraia:
+          Se disponível, também extraia:
           - endereco: endereço completo do local
           - preco: valor da entrada (se aplicável)
           - tipo: tipo do evento (show, festa, lançamento, etc.)
-          - descricao: breve descrição ou informações adicionais` : ''}
+          - descricao: breve descrição ou informações adicionais
           
           Retorne um JSON no seguinte formato:
           {
             "eventos": [
               {
                 "atracao": "Nome da Atração 1",
-                "data": "DD/MM/AAAA",
+                "data": "DD/MM/2025",
                 "hora": "HH:MM",
                 "local": "Nome do Local",
                 "cidade": "Nome da Cidade",
@@ -450,6 +482,8 @@
           }
           
           Se houver apenas um evento, ainda retorne-o dentro do array "eventos".
+          Não inclua eventos duplicados, se parecer o mesmo evento, mantenha apenas uma entrada.
+          NUNCA use o ano 2024 em nenhuma data, todos os eventos devem ser de 2025 ou mais recentes.
         `;
         
         // Chamar a API Gemini
@@ -460,7 +494,7 @@
             parts: [
               { text: promptParaGemini },
               { inline_data: {
-                  mime_type: file.type,
+                  mime_type: file ? file.type : "image/jpeg",
                   data: imageData.split(',')[1]
                 }
               }
@@ -499,40 +533,42 @@
         if (eventosExtraidos && eventosExtraidos.length > 0) {
           eventos = eventosExtraidos;
           
-          // Completar informações faltantes com padrões
+          // Completar informações faltantes com padrões e corrigir datas para 2025
           eventos = eventos.map(evento => {
             // Adicionar cidade padrão se não especificada
             if (!evento.cidade) evento.cidade = "João Pessoa";
-              // Tratar o formato da data (converter AAAA para o ano atual, caso aplicável)
+            
+            // Tratar o formato da data
             if (evento.data) {
-              // Se contiver AAAA, substitua pelo ano atual
+              // Se contiver AAAA, substitua pelo ano 2025
               if (evento.data.includes('AAAA')) {
-                const anoAtual = new Date().getFullYear();
-                evento.data = evento.data.replace('AAAA', anoAtual);
+                evento.data = evento.data.replace('AAAA', '2025');
               }
-              // Se não tiver ano (formato DD/MM), adicione o ano atual
-              else if (!evento.data.match(/\d{4}$/) && !evento.data.match(/\/\d{4}/)) {
-                const anoAtual = new Date().getFullYear();
-                
-                // Verificar se estamos perto da virada do ano e o evento é para início do próximo ano
-                const hoje = new Date();
-                const mes = hoje.getMonth() + 1; // Janeiro é 0
-                const dia = hoje.getDate();
-                
-                // Se estamos em dezembro (12) e o evento é em janeiro ou fevereiro
-                const [eventoDia, eventoMes] = evento.data.split('/').map(n => parseInt(n));
-                let anoEvento = anoAtual;
-                
-                if (mes === 12 && dia >= 15 && eventoMes <= 2) {
-                  anoEvento = anoAtual + 1;
+              // Se não tiver ano (formato DD/MM), adicione 2025
+              else if (!evento.data.match(/\/\d{4}$/) && !evento.data.match(/\d{4}$/)) {
+                evento.data = `${evento.data}/2025`;
+              } 
+              // Se tiver 2024 como ano, substitua por 2025
+              else if (evento.data.includes('2024')) {
+                evento.data = evento.data.replace('2024', '2025');
+              }
+              // Garante que a data está no formato correto
+              const partes = evento.data.split('/');
+              if (partes.length === 3) {
+                // Se o ano não for explicitamente 2025 ou maior, corrige para 2025
+                const ano = parseInt(partes[2]);
+                if (ano < 2025) {
+                  partes[2] = '2025';
+                  evento.data = partes.join('/');
                 }
-                
-                evento.data = `${evento.data}/${anoEvento}`;
               }
             }
             
             return evento;
           });
+          
+          // Remover eventos duplicados com lógica aprimorada
+          eventos = removerEventosDuplicados(eventos);
           
           // Mostrar os eventos na interface
           mostrarEventosDetectados(eventos);
@@ -552,6 +588,55 @@
         document.getElementById("processButton").disabled = false;
         alert("Erro ao processar imagem: " + error.message);
       }
+    }
+    
+    // Função para remover eventos duplicados com base na atração e data
+    function removerEventosDuplicados(listaEventos) {
+      const eventosUnicos = [];
+      const chavesEventos = new Set();
+      
+      for (const evento of listaEventos) {
+        // Criar uma chave única para cada evento baseada na atração, data e local
+        // Normaliza os textos removendo espaços extras, acentos e convertendo para minúsculo
+        const normalizarTexto = (texto) => {
+          if (!texto) return '';
+          return texto.toLowerCase()
+                      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                      .replace(/\s+/g, ' ')
+                      .trim();
+        };
+        
+        const atracao = normalizarTexto(evento.atracao);
+        const data = normalizarTexto(evento.data);
+        const local = normalizarTexto(evento.local);
+        const hora = normalizarTexto(evento.hora);
+        
+        // Chave composta para identificar eventos únicos
+        const chave = `${atracao}|${data}|${local}|${hora}`;
+        
+        // Verificar se é um evento único ou variação de um já existente
+        let isDuplicado = false;
+        
+        // Procurar por similaridade em atrações existentes
+        for (const chaveExistente of chavesEventos) {
+          // Se a atração e data são as mesmas, considera como duplicado
+          const [atracaoExistente, dataExistente] = chaveExistente.split('|');
+          if (atracao && atracaoExistente && 
+              (atracao.includes(atracaoExistente) || atracaoExistente.includes(atracao)) && 
+              data === dataExistente) {
+            isDuplicado = true;
+            break;
+          }
+        }
+        
+        // Se não for um duplicado, adicionar à lista de eventos únicos
+        if (!isDuplicado && !chavesEventos.has(chave)) {
+          chavesEventos.add(chave);
+          eventosUnicos.push(evento);
+        }
+      }
+      
+      return eventosUnicos;
     }
     
     // Extrair eventos do JSON na resposta do Gemini

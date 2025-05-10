@@ -117,6 +117,7 @@
       max-width: 100%;
       max-height: 400px;
       border-radius: 4px;
+      display: none; /* Adicionado para esconder a imagem até que seja carregada */
     }
     
     pre {
@@ -188,26 +189,6 @@
       color: #777;
     }
     
-    .advanced-options {
-      margin-top: 20px;
-      padding: 15px;
-      background-color: var(--light);
-      border-radius: 8px;
-      display: none;
-    }
-    
-    .toggle-advanced {
-      font-size: 14px;
-      color: var(--primary);
-      cursor: pointer;
-      margin: 10px 0;
-      display: inline-block;
-    }
-    
-    .toggle-advanced:hover {
-      text-decoration: underline;
-    }
-    
     @media (max-width: 600px) {
       body {
         padding: 10px;
@@ -222,6 +203,8 @@
       <a href="escolha.html" style="color: var(--primary); font-size: 0.9em; text-decoration: none;">← Voltar para escolha</a>
       <span style="margin: 0 10px;">|</span>
       <a href="index-gemini.html" style="color: var(--primary); font-size: 0.9em; text-decoration: none;">Alternar para modo Gemini (multi-eventos) →</a>
+      <span style="margin: 0 10px;">|</span>
+      <a href="eventos_view.html" style="color: var(--primary); font-size: 0.9em; text-decoration: none;">Ver todos os eventos →</a>
     </div>
     
     <div class="input-area">
@@ -229,6 +212,10 @@
         <label class="file-input-label" for="imageInput">Escolher imagem de evento</label>
         <input class="file-input" type="file" accept="image/*" id="imageInput" />
       </div>
+      
+      <p style="text-align: center; margin: 10px 0; color: #666;">
+        <i>Você também pode colar uma imagem diretamente da área de transferência (Ctrl+V)</i>
+      </p>
     </div>
     
     <div class="preview-container">
@@ -259,20 +246,6 @@
     <button onclick="enviarEvento()">Enviar para API</button>
   </div>
   
-  <div class="container">
-    <span class="toggle-advanced" onclick="toggleAdvanced()">Opções Avançadas ▾</span>
-    <div class="advanced-options" id="advancedOptions">
-      <h4>Configurações de OCR</h4>
-      <select id="ocrEngine">
-        <option value="por">Português</option>
-        <option value="eng">Inglês</option>
-        <option value="por+eng">Português + Inglês</option>
-      </select>
-      <label><input type="checkbox" id="useEnhancement" checked> Aprimorar imagem antes do OCR</label>
-      <button onclick="reprocessWithOptions()">Reprocessar com estas opções</button>
-    </div>
-  </div>
-
   <script>
     let rawText = "";
     let evento = {};
@@ -286,7 +259,9 @@
       
       const reader = new FileReader();
       reader.onload = function(e) {
-        document.getElementById("preview").src = e.target.result;
+        const preview = document.getElementById("preview");
+        preview.src = e.target.result;
+        preview.style.display = "block"; // Mostrar imagem quando carregada
         lastImageData = e.target.result;
       };
       reader.readAsDataURL(file);
@@ -295,18 +270,37 @@
       document.getElementById("resultContainer").style.display = "none";
     });
     
-    function toggleAdvanced() {
-      const advancedOptions = document.getElementById("advancedOptions");
-      advancedOptions.style.display = advancedOptions.style.display === "none" ? "block" : "none";
-    }
-    
-    function reprocessWithOptions() {
-      if (lastImageData) {
-        processImage(true);
-      } else {
-        alert("Por favor, selecione uma imagem primeiro.");
+    // Adicionar suporte para colar imagem da área de transferência
+    document.addEventListener('paste', function(event) {
+      const items = (event.clipboardData || event.originalEvent.clipboardData).items;
+      
+      for (const item of items) {
+        if (item.type.indexOf('image') === 0) {
+          const blob = item.getAsFile();
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            const preview = document.getElementById("preview");
+            preview.src = e.target.result;
+            preview.style.display = "block"; // Mostrar imagem quando colada
+            lastImageData = e.target.result;
+            
+            // Esconder resultados anteriores
+            document.getElementById("resultContainer").style.display = "none";
+            
+            // Opcional: Informar ao usuário que a imagem foi colada
+            alert("Imagem colada com sucesso! Clique em 'Extrair Evento' para processar.");
+          };
+          reader.readAsDataURL(blob);
+          break;
+        }
       }
-    }
+    });
+    
+    // Configurações padrão para OCR
+    const defaultOcrSettings = {
+      language: "por+eng",  // Português + Inglês
+      useEnhancement: true  // Aprimorar imagem
+    };
     
     function enhanceImageForOCR(imageData) {
       return new Promise((resolve) => {
@@ -364,34 +358,35 @@
       } else {
         const input = document.getElementById("imageInput");
         const file = input.files[0];
-        if (!file) {
-          alert("Selecione uma imagem.");
+        if (!file && !lastImageData) {
+          alert("Selecione uma imagem ou cole uma imagem da área de transferência.");
           document.getElementById("loading").style.display = "none";
           document.getElementById("processButton").disabled = false;
           return;
         }
         
-        const reader = new FileReader();
-        imageData = await new Promise((resolve) => {
-          reader.onload = e => resolve(e.target.result);
-          reader.readAsDataURL(file);
-        });
-        lastImageData = imageData;
-      }
-      
-      // Enhance image if option is checked
-      const useEnhancement = document.getElementById("useEnhancement").checked;
-      if (useEnhancement) {
-        try {
-          document.getElementById("statusMessage").textContent = "Aprimorando imagem...";
-          imageData = await enhanceImageForOCR(imageData);
-        } catch (error) {
-          console.error("Erro ao aprimorar imagem:", error);
+        if (file) {
+          const reader = new FileReader();
+          imageData = await new Promise((resolve) => {
+            reader.onload = e => resolve(e.target.result);
+            reader.readAsDataURL(file);
+          });
+          lastImageData = imageData;
+        } else {
+          imageData = lastImageData;
         }
       }
       
-      // Get selected language
-      const language = document.getElementById("ocrEngine").value;
+      // Enhance image
+      try {
+        document.getElementById("statusMessage").textContent = "Aprimorando imagem...";
+        imageData = await enhanceImageForOCR(imageData);
+      } catch (error) {
+        console.error("Erro ao aprimorar imagem:", error);
+      }
+      
+      // Usar configurações padrão para OCR
+      const language = defaultOcrSettings.language;
       
       // Run OCR with Tesseract.js
       document.getElementById("statusMessage").textContent = "Reconhecendo texto...";
