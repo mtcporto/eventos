@@ -107,8 +107,10 @@ def eventos():
                     'tipo': e.f_tipo
                 })
             
-            # Retorna JSON com resultados
-            return response.json(resultado)
+            # Retorna JSON com resultados no formato esperado pelo frontend
+            return response.json({
+                'eventos': resultado
+            })
         
         except Exception as e:
             import sys
