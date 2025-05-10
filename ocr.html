@@ -248,7 +248,7 @@
     let rawText = "";
     let evento = {};
     let confidence = 0;
-    let lastImageData = null;
+    let lastImageData = null; // Variável para armazenar a imagem escaneada mais recente
     
     // Iniciando elementos quando a página carrega
     document.addEventListener('DOMContentLoaded', function() {
@@ -651,7 +651,8 @@
         endereco: evento.endereco || '',
         preco: evento.preco || '',
         descricao: evento.tipo || '',
-        tipo: evento.tipo || ''
+        tipo: evento.tipo || '',
+        imagem: lastImageData || '' // Incluir a imagem escaneada
       };
       
       // URL da API original

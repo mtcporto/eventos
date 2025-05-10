@@ -50,58 +50,85 @@ def eventos():
                 f_onde=data['onde'],
                 f_fonte=data['fonte'],
                 f_local=data['local'],
-                f_imagem=data.get('imagem', None),
+                f_imagem=data.get('imagem', None),  # Armazena a imagem do cartaz do evento
                 f_endereco=data.get('endereco', None),
                 f_preco=data.get('preco', None),
                 f_descricao=data.get('descricao', None),
                 f_tipo=data.get('tipo', None),
-                f_data_cadastro=request.now
             )
             
-            # Commit na transação
+            # Commit explícito
             db.commit()
             
-            # Retornar resposta de sucesso
             return response.json({
-                'status': 'success',
-                'message': 'Evento cadastrado com sucesso',
+                'status': 'ok',
                 'id': evento_id
             })
+        
         except Exception as e:
-            # Log do erro e rollback
-            import sys, traceback
-            print("Erro: ", sys.exc_info())
-            print(traceback.format_exc())
+            # Rollback em caso de erro
             db.rollback()
+            import sys
+            import traceback
+            
+            # Log detalhado do erro
+            tb = traceback.format_exc()
+            print(tb)
             
             return response.json({
-                'error': 'Erro ao processar requisição: {0}'.format(str(e))
-            })
+                'status': 'error',
+                'message': str(e),
+                'traceback': tb
+            }, status=500)
     
-    # Para requisições GET
+    # Para requisições GET - listar eventos
     elif request.env.request_method == 'GET':
         try:
-            # Lista eventos limitados aos 100 mais recentes
-            eventos = db(db.t_eventos).select(
-                orderby=~db.t_eventos.f_data_cadastro,
-                limitby=(0, 100)
-            )
+            # Query padrão
+            query = (db.t_eventos.id > 0)
             
-            # Formatar para JSON
-            return response.json({
-                'eventos': [{'id': e.id,
-                           'oque': e.f_oque,
-                           'quando': e.f_quando,
-                           'onde': e.f_onde,
-                           'local': e.f_local,
-                           'fonte': e.f_fonte} 
-                          for e in eventos]
-            })
+            # Pega resultados do banco
+            eventos = db(query).select(orderby=~db.t_eventos.id)
+            
+            # Formata saída
+            resultado = []
+            for e in eventos:
+                resultado.append({
+                    'id': e.id,
+                    'oque': e.f_oque,
+                    'quando': e.f_quando,
+                    'onde': e.f_onde,
+                    'local': e.f_local,
+                    'fonte': e.f_fonte,
+                    'imagem': e.f_imagem,  # Inclui a imagem na resposta
+                    'endereco': e.f_endereco,
+                    'preco': e.f_preco,
+                    'descricao': e.f_descricao,
+                    'tipo': e.f_tipo
+                })
+            
+            # Retorna JSON com resultados
+            return response.json(resultado)
+        
         except Exception as e:
-            return response.json({'error': str(e)})
+            import sys
+            import traceback
+            
+            # Log detalhado do erro
+            tb = traceback.format_exc()
+            print(tb)
+            
+            return response.json({
+                'status': 'error',
+                'message': str(e),
+                'traceback': tb
+            }, status=500)
     
-    # Para outras requisições
-    return response.json({'message': 'Método não suportado'})
+    # Método não suportado
+    else:
+        return response.json({
+            'error': 'Método não suportado'
+        }, status=405)
 
 # Para testar o funcionamento
 def api_teste():

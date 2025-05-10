@@ -956,24 +956,29 @@
           // Construir objeto com dados do evento
           const evento = {
             oque: atracao,
-            quando: data + ' ' + getValueByLabel('Horário:'),
-            onde: getValueByLabel('Cidade:') || 'João Pessoa',
-            fonte: getValueByLabel('Fonte:') || 'Mini Agente de Eventos',
-            local: getValueByLabel('Local:') || 'Local não especificado'
+            quando: data + ' ' + getValueByLabel('Horário'),
+            onde: getValueByLabel('Cidade') || 'João Pessoa',
+            fonte: getValueByLabel('Fonte') || 'Mini Agente de Eventos',
+            local: getValueByLabel('Local') || 'Local não especificado'
           };
           
           // Adicionar campos opcionais se existirem
-          const endereco = getValueByLabel('Endereço:');
+          const endereco = getValueByLabel('Endereço');
           if (endereco) evento.endereco = endereco;
           
-          const preco = getValueByLabel('Preço:');
+          const preco = getValueByLabel('Preço');
           if (preco) evento.preco = preco;
           
-          const tipo = getValueByLabel('Tipo:');
+          const tipo = getValueByLabel('Tipo');
           if (tipo) evento.tipo = tipo;
           
-          const descricao = getValueByLabel('Descrição:');
+          const descricao = getValueByLabel('Descrição');
           if (descricao) evento.descricao = descricao;
+          
+          // Sempre incluir a imagem do evento se disponível
+          if (lastImageData) {
+            evento.imagem = lastImageData;
+          }
           
           // Registrar o que será enviado
           console.log("Enviando evento:", evento);
