@@ -111,13 +111,14 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      background-color: white; /* Fundo branco para o container */
     }
     
     #preview {
       max-width: 100%;
       max-height: 400px;
       border-radius: 4px;
-      display: none; /* Adicionado para esconder a imagem até que seja carregada */
+      display: none; /* Esconder até que seja carregada */
     }
     
     pre {
@@ -252,6 +253,28 @@
     let confidence = 0;
     let lastImageData = null;
     
+    // Iniciando elementos quando a página carrega
+    document.addEventListener('DOMContentLoaded', function() {
+      const preview = document.getElementById('preview');
+      // Garantir que o preview comece oculto
+      preview.style.display = 'none';
+      
+      // Adicionar área de visualização vazia no preview-container
+      const previewContainer = document.querySelector('.preview-container');
+      if (previewContainer) {
+        const previewPlaceholder = document.createElement('div');
+        previewPlaceholder.id = 'preview-placeholder';
+        previewPlaceholder.textContent = 'Selecione ou cole uma imagem';
+        previewPlaceholder.style.color = '#999';
+        previewPlaceholder.style.display = 'flex';
+        previewPlaceholder.style.alignItems = 'center';
+        previewPlaceholder.style.justifyContent = 'center';
+        previewPlaceholder.style.width = '100%';
+        previewPlaceholder.style.height = '200px';
+        previewContainer.appendChild(previewPlaceholder);
+      }
+    });
+    
     // Show image preview immediately when file is selected
     document.getElementById("imageInput").addEventListener("change", function() {
       const file = this.files[0];
@@ -260,8 +283,22 @@
       const reader = new FileReader();
       reader.onload = function(e) {
         const preview = document.getElementById("preview");
+        const placeholder = document.getElementById("preview-placeholder");
+        
+        if (placeholder) placeholder.style.display = "none";
+        
+        preview.onload = function() {
+          preview.style.display = "block"; // Mostrar imagem quando carregada
+          if (placeholder) placeholder.style.display = "none";
+        };
+        
+        preview.onerror = function() {
+          preview.style.display = "none"; // Esconder em caso de erro
+          if (placeholder) placeholder.style.display = "flex";
+          console.error("Erro ao carregar imagem");
+        };
+        
         preview.src = e.target.result;
-        preview.style.display = "block"; // Mostrar imagem quando carregada
         lastImageData = e.target.result;
       };
       reader.readAsDataURL(file);
@@ -280,8 +317,15 @@
           const reader = new FileReader();
           reader.onload = function(e) {
             const preview = document.getElementById("preview");
+            const placeholder = document.getElementById("preview-placeholder");
+            
+            if (placeholder) placeholder.style.display = "none";
+            
+            preview.onload = function() {
+              preview.style.display = "block"; // Mostrar imagem quando carregada
+            };
+            
             preview.src = e.target.result;
-            preview.style.display = "block"; // Mostrar imagem quando colada
             lastImageData = e.target.result;
             
             // Esconder resultados anteriores
@@ -347,15 +391,13 @@
       });
     }
     
-    async function processImage(useExistingImage = false) {
+    async function processImage() {
       // Show loading state
       document.getElementById("loading").style.display = "block";
       document.getElementById("processButton").disabled = true;
       
-      let imageData;
-      if (useExistingImage && lastImageData) {
-        imageData = lastImageData;
-      } else {
+      try {
+        // Obter dados da imagem
         const input = document.getElementById("imageInput");
         const file = input.files[0];
         if (!file && !lastImageData) {
@@ -365,9 +407,10 @@
           return;
         }
         
+        let imageData;
         if (file) {
-          const reader = new FileReader();
           imageData = await new Promise((resolve) => {
+            const reader = new FileReader();
             reader.onload = e => resolve(e.target.result);
             reader.readAsDataURL(file);
           });
@@ -375,53 +418,58 @@
         } else {
           imageData = lastImageData;
         }
-      }
-      
-      // Enhance image
-      try {
-        document.getElementById("statusMessage").textContent = "Aprimorando imagem...";
-        imageData = await enhanceImageForOCR(imageData);
-      } catch (error) {
-        console.error("Erro ao aprimorar imagem:", error);
-      }
-      
-      // Usar configurações padrão para OCR
-      const language = defaultOcrSettings.language;
-      
-      // Run OCR with Tesseract.js
-      document.getElementById("statusMessage").textContent = "Reconhecendo texto...";
-      Tesseract.recognize(imageData, language, {
-        logger: m => {
-          console.log(m);
-          if (m.status === "recognizing text") {
-            document.getElementById("statusMessage").textContent = 
-              `Reconhecendo texto... ${Math.round(m.progress * 100)}%`;
-          }
+        
+        // Enhance image
+        try {
+          document.getElementById("statusMessage").textContent = "Aprimorando imagem...";
+          imageData = await enhanceImageForOCR(imageData);
+        } catch (error) {
+          console.error("Erro ao aprimorar imagem:", error);
         }
-      }).then(({ data: { text, confidence: ocrConfidence } }) => {
-        // Update UI with results
-        document.getElementById("rawText").innerText = text;
-        rawText = text;
-        confidence = ocrConfidence;
         
-        // Update confidence meter
-        document.getElementById("confidenceMeter").style.width = `${ocrConfidence}%`;
-        document.getElementById("confidenceText").textContent = `Confiança: ${Math.round(ocrConfidence)}%`;
+        // Usar configurações padrão para OCR
+        const language = defaultOcrSettings.language;
         
-        // Process the extracted text
-        evento = parseEvento(text);
-        document.getElementById("parsedData").innerText = JSON.stringify(evento, null, 2);
-        
-        // Show results and hide loading
-        document.getElementById("resultContainer").style.display = "block";
+        // Run OCR with Tesseract.js
+        document.getElementById("statusMessage").textContent = "Reconhecendo texto...";
+        Tesseract.recognize(imageData, language, {
+          logger: m => {
+            console.log(m);
+            if (m.status === "recognizing text") {
+              document.getElementById("statusMessage").textContent = 
+                `Reconhecendo texto... ${Math.round(m.progress * 100)}%`;
+            }
+          }
+        }).then(({ data: { text, confidence: ocrConfidence } }) => {
+          // Update UI with results
+          document.getElementById("rawText").innerText = text;
+          rawText = text;
+          confidence = ocrConfidence;
+          
+          // Update confidence meter
+          document.getElementById("confidenceMeter").style.width = `${ocrConfidence}%`;
+          document.getElementById("confidenceText").textContent = `Confiança: ${Math.round(ocrConfidence)}%`;
+          
+          // Process the extracted text
+          evento = parseEvento(text);
+          document.getElementById("parsedData").innerText = JSON.stringify(evento, null, 2);
+          
+          // Show results and hide loading
+          document.getElementById("resultContainer").style.display = "block";
+          document.getElementById("loading").style.display = "none";
+          document.getElementById("processButton").disabled = false;
+        }).catch(err => {
+          console.error(err);
+          alert("Erro ao processar imagem: " + err.message);
+          document.getElementById("loading").style.display = "none";
+          document.getElementById("processButton").disabled = false;
+        });
+      } catch (error) {
+        console.error("Erro ao processar imagem:", error);
         document.getElementById("loading").style.display = "none";
         document.getElementById("processButton").disabled = false;
-      }).catch(err => {
-        console.error(err);
-        alert("Erro ao processar imagem: " + err.message);
-        document.getElementById("loading").style.display = "none";
-        document.getElementById("processButton").disabled = false;
-      });
+        alert("Erro ao processar imagem: " + error.message);
+      }
     }
 
     function parseEvento(texto) {
@@ -430,7 +478,18 @@
       // Data/Date extraction
       const dataMatch = texto.match(/(\d{1,2})\/([A-Za-zÇçÃãÉéÍíÓóÚú]+|\d{1,2})(\/\d{2,4})?/i);
       if (dataMatch) {
-        evento.data = dataMatch[0];
+        let data = dataMatch[0];
+        
+        // Verificar se contém ano - se não contiver, adicionar 2025
+        if (!data.match(/\/\d{4}$/) && !data.match(/\d{4}$/)) {
+          data = `${data}/2025`;
+        }
+        // Se tiver 2024 como ano, substituir por 2025
+        else if (data.includes('2024')) {
+          data = data.replace('2024', '2025');
+        }
+        
+        evento.data = data;
       }
 
       // Hora/Time extraction - Handle formats like 20h, 20h30
@@ -589,6 +648,8 @@
         evento.bairro = "TAMBIÁ";
       }
 
+      evento.cidade = "João Pessoa";
+      
       return evento;
     }
 
@@ -599,7 +660,7 @@
       const dadosEvento = {
         oque: evento.atracao,
         quando: `${evento.data} ${evento.hora || ''}`.trim(),
-        onde: evento.local || 'Local não especificado',
+        onde: evento.cidade || 'João Pessoa',
         fonte: 'Mini Agente de Eventos',
         local: evento.local || 'Local não especificado',
         endereco: evento.endereco || '',
@@ -633,50 +694,32 @@
         alert(`Evento enviado com sucesso! ID: ${data.id}`);
       })
       .catch(err => {
-        console.error("Estratégia 1 falhou, tentando proxy CORS:", err);
+        console.error("Estratégia 1 falhou, tentando FormData:", err);
         
-        // Estratégia 2: Tentar com proxy CORS
-        const corsProxies = [
-          'https://corsproxy.io/?',
-          'https://cors-anywhere.herokuapp.com/'
-        ];
+        // Estratégia 2: Tentar com FormData
+        const formData = new FormData();
+        Object.entries(dadosEvento).forEach(([key, value]) => {
+          formData.append(key, value);
+        });
         
-        // Função para tentar enviar com diferentes proxies
-        function tentarComProxy(index) {
-          if (index >= corsProxies.length) {
-            // Se todos os proxies falharem, tenta a próxima estratégia
-            tentarFormulario();
-            return;
+        fetch(apiUrl, {
+          method: "POST",
+          body: formData,
+          mode: 'cors'
+        })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`Erro HTTP: ${response.status}`);
           }
+          return response.json();
+        })
+        .then(data => {
+          alert(`Evento enviado com sucesso! ID: ${data.id}`);
+        })
+        .catch(err => {
+          console.error("Estratégia 2 falhou, tentando formulário:", err);
           
-          fetch(corsProxies[index] + encodeURIComponent(apiUrl), {
-            method: "POST",
-            headers: { 
-              "Content-Type": "application/json",
-              "X-Requested-With": "XMLHttpRequest"
-            },
-            body: JSON.stringify(dadosEvento)
-          })
-          .then(response => {
-            if (!response.ok) {
-              throw new Error(`Erro HTTP: ${response.status}`);
-            }
-            return response.json();
-          })
-          .then(data => {
-            alert(`Evento enviado com sucesso! ID: ${data.id}`);
-          })
-          .catch(err => {
-            console.error(`Proxy ${corsProxies[index]} falhou:`, err);
-            // Tenta o próximo proxy
-            tentarComProxy(index + 1);
-          });
-        }
-        
-        // Estratégia 3: Usar formulário para contornar CORS
-        function tentarFormulario() {
-          console.log("Tentando método de formulário para contornar CORS");
-          
+          // Estratégia 3: Usar formulário para contornar CORS
           try {
             // Criar formulário invisível
             const form = document.createElement('form');
@@ -708,13 +751,9 @@
             console.error("Erro ao tentar método de formulário:", error);
             alert(`Todas as estratégias de envio falharam. Erro: ${error.message}`);
           }
-        }
-        
-        // Iniciar com o primeiro proxy
-        tentarComProxy(0);
+        });
       });
     }
-    
   </script>
 </body>
 </html>
