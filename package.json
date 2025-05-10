@@ -1,0 +1,19 @@
+{
+  "name": "mini-agente-eventos",
+  "version": "1.0.0",
+  "description": "Mini Agente para extração de informações de eventos a partir de imagens",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'No build step required'",
+    "start": "vercel dev"
+  },
+  "dependencies": {
+    "mongodb": "^5.2.0"
+  },
+  "devDependencies": {
+    "vercel": "^28.20.0"
+  },
+  "author": "",
+  "license": "MIT"
+}

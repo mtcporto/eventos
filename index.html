@@ -599,15 +599,127 @@
 
     function enviarEvento() {
       if (!evento.atracao) return alert("Nenhum evento detectado ainda.");
-      fetch("https://sua-api.com/eventos", {
+      
+      // Preparar os dados de acordo com o formato esperado pela API
+      const dadosEvento = {
+        oque: evento.atracao,
+        quando: `${evento.data} ${evento.hora || ''}`.trim(),
+        onde: evento.local || 'Local não especificado',
+        fonte: 'Mini Agente de Eventos',
+        local: evento.local || 'Local não especificado',
+        endereco: evento.endereco || '',
+        preco: evento.preco || '',
+        descricao: evento.tipo || '',
+        tipo: evento.tipo || ''
+      };
+      
+      // URL da API original
+      const apiUrl = 'https://mtcporto2.pythonanywhere.com/eventos/default/eventos';
+      
+      // Mostrar mensagem de status
+      alert("Enviando evento...");
+      
+      // Estratégia 1: Tentar requisição direta com JSON
+      fetch(apiUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(evento)
+        headers: { 
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(dadosEvento),
+        mode: 'cors' // Explicitamente solicitar modo CORS
       })
-      .then(res => res.json())
-      .then(data => alert("Enviado com sucesso!"))
-      .catch(err => alert("Erro ao enviar: " + err.message));
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Erro HTTP: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        alert(`Evento enviado com sucesso! ID: ${data.id}`);
+      })
+      .catch(err => {
+        console.error("Estratégia 1 falhou, tentando proxy CORS:", err);
+        
+        // Estratégia 2: Tentar com proxy CORS
+        const corsProxies = [
+          'https://corsproxy.io/?',
+          'https://cors-anywhere.herokuapp.com/'
+        ];
+        
+        // Função para tentar enviar com diferentes proxies
+        function tentarComProxy(index) {
+          if (index >= corsProxies.length) {
+            // Se todos os proxies falharem, tenta a próxima estratégia
+            tentarFormulario();
+            return;
+          }
+          
+          fetch(corsProxies[index] + encodeURIComponent(apiUrl), {
+            method: "POST",
+            headers: { 
+              "Content-Type": "application/json",
+              "X-Requested-With": "XMLHttpRequest"
+            },
+            body: JSON.stringify(dadosEvento)
+          })
+          .then(response => {
+            if (!response.ok) {
+              throw new Error(`Erro HTTP: ${response.status}`);
+            }
+            return response.json();
+          })
+          .then(data => {
+            alert(`Evento enviado com sucesso! ID: ${data.id}`);
+          })
+          .catch(err => {
+            console.error(`Proxy ${corsProxies[index]} falhou:`, err);
+            // Tenta o próximo proxy
+            tentarComProxy(index + 1);
+          });
+        }
+        
+        // Estratégia 3: Usar formulário para contornar CORS
+        function tentarFormulario() {
+          console.log("Tentando método de formulário para contornar CORS");
+          
+          try {
+            // Criar formulário invisível
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = apiUrl;
+            form.target = '_blank'; // Abrir em nova aba
+            form.style.display = 'none';
+            
+            // Adicionar campos ao formulário
+            for (const [key, value] of Object.entries(dadosEvento)) {
+              const input = document.createElement('input');
+              input.type = 'hidden';
+              input.name = key;
+              input.value = value;
+              form.appendChild(input);
+            }
+            
+            // Adicionar ao DOM e enviar
+            document.body.appendChild(form);
+            
+            alert("Abrindo formulário de envio em nova aba...");
+            form.submit();
+            
+            // Limpar formulário do DOM
+            setTimeout(() => {
+              document.body.removeChild(form);
+            }, 1000);
+          } catch (error) {
+            console.error("Erro ao tentar método de formulário:", error);
+            alert(`Todas as estratégias de envio falharam. Erro: ${error.message}`);
+          }
+        }
+        
+        // Iniciar com o primeiro proxy
+        tentarComProxy(0);
+      });
     }
+    
   </script>
 </body>
 </html>
