@@ -830,124 +830,137 @@
     }
       // Enviar eventos selecionados para a API
     async function enviarEventos() {
-      // Coletar todos os eventos das cards
+      // Obter todos os cards de eventos selecionados
       const eventCards = document.querySelectorAll('.event-card');
-      if (eventCards.length === 0) {
-        alert("Nenhum evento detectado para enviar.");
-        return;
-      }
-    
-      const eventos = [];
-      eventCards.forEach(card => {
-        // Verifica se o checkbox está marcado
-        const checkbox = card.querySelector('input[type="checkbox"]');
-        if (!checkbox || !checkbox.checked) return;
-        
-        // Extrair dados do card
-        const evento = {
-          oque: card.querySelector('.event-card-title').textContent,
-          quando: card.querySelector('.event-card-date').textContent + ' ' + 
-                 (card.querySelector('.event-card-item-value')?.textContent || ''),
-          onde: Array.from(card.querySelectorAll('.event-card-item-label'))
-                .find(el => el.textContent === 'Cidade:')
-                ?.nextElementSibling?.textContent || 'João Pessoa',
-          fonte: Array.from(card.querySelectorAll('.event-card-item-label'))
-                .find(el => el.textContent === 'Fonte:')
-                ?.nextElementSibling?.textContent || '',
-          local: Array.from(card.querySelectorAll('.event-card-item-label'))
-                .find(el => el.textContent === 'Local:')
-                ?.nextElementSibling?.textContent || ''
-        };
-        
-        // Adicionar campos opcionais se existirem
-        const endereco = Array.from(card.querySelectorAll('.event-card-item-label'))
-                        .find(el => el.textContent === 'Endereço:')
-                        ?.nextElementSibling?.textContent;
-        if (endereco) evento.endereco = endereco;
-        
-        const preco = Array.from(card.querySelectorAll('.event-card-item-label'))
-                    .find(el => el.textContent === 'Preço:')
-                    ?.nextElementSibling?.textContent;
-        if (preco) evento.preco = preco;
-        
-        const tipo = Array.from(card.querySelectorAll('.event-card-item-label'))
-                    .find(el => el.textContent === 'Tipo:')
-                    ?.nextElementSibling?.textContent;
-        if (tipo) evento.tipo = tipo;
-        
-        const descricao = Array.from(card.querySelectorAll('.event-card-item-label'))
-                        .find(el => el.textContent === 'Descrição:')
-                        ?.nextElementSibling?.textContent;
-        if (descricao) evento.descricao = descricao;
-        
-        eventos.push(evento);
-      });
+      const selecionados = Array.from(eventCards).filter(card => 
+        card.querySelector('input[type="checkbox"]').checked
+      );
       
-      if (eventos.length === 0) {
+      if (selecionados.length === 0) {
         alert("Nenhum evento selecionado para envio.");
         return;
       }
       
-      console.log("Eventos a serem enviados:", eventos);
+      // Desabilitar botão durante o envio
+      const sendButton = document.getElementById('sendButton');
+      sendButton.disabled = true;
+      sendButton.textContent = 'Enviando...';
       
       // URL da API
       const apiUrl = 'https://mtcporto2.pythonanywhere.com/eventos/default/eventos';
       
-      // Resultados
+      // Contadores para feedback
       let sucessos = 0;
       let falhas = 0;
       let mensagens = [];
       
-      // Enviar cada evento individualmente
-      for (const evento of eventos) {
+      // Processar cada evento selecionado
+      for (const card of selecionados) {
         try {
-          // Enviar como JSON - abordagem simples que funciona em seu outro projeto
-          const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(evento)
-          });
+          // Extrair dados do card
+          const atracao = card.querySelector('.event-card-title').textContent;
+          const data = card.querySelector('.event-card-date').textContent;
           
-          if (response.ok) {
-            const data = await response.json();
-            console.log(`Evento enviado com sucesso: ${data.id}`);
-            sucessos++;
-          } else {
-            // Se falhar com JSON, tentar com FormData
+          // Buscar valores de elementos com determinados rótulos
+          const getValueByLabel = (label) => {
+            const labelElement = Array.from(card.querySelectorAll('.event-card-item-label'))
+              .find(el => el.textContent === label);
+            return labelElement?.nextElementSibling?.textContent || '';
+          };
+          
+          // Construir objeto com dados do evento
+          const evento = {
+            oque: atracao,
+            quando: data + ' ' + getValueByLabel('Horário:'),
+            onde: getValueByLabel('Cidade:') || 'João Pessoa',
+            fonte: getValueByLabel('Fonte:') || 'Mini Agente de Eventos',
+            local: getValueByLabel('Local:') || 'Local não especificado'
+          };
+          
+          // Adicionar campos opcionais se existirem
+          const endereco = getValueByLabel('Endereço:');
+          if (endereco) evento.endereco = endereco;
+          
+          const preco = getValueByLabel('Preço:');
+          if (preco) evento.preco = preco;
+          
+          const tipo = getValueByLabel('Tipo:');
+          if (tipo) evento.tipo = tipo;
+          
+          const descricao = getValueByLabel('Descrição:');
+          if (descricao) evento.descricao = descricao;
+          
+          // Registrar o que será enviado
+          console.log("Enviando evento:", evento);
+          
+          // Tentativa 1: Enviar como dados de formulário
+          try {
+            // Criar objeto FormData
             const formData = new FormData();
             Object.entries(evento).forEach(([key, value]) => {
               formData.append(key, value);
             });
             
-            const formResponse = await fetch(apiUrl, {
+            // Enviar requisição fetch
+            const response = await fetch(apiUrl, {
               method: 'POST',
-              body: formData
+              body: formData,
+              mode: 'cors'
             });
             
-            if (formResponse.ok) {
-              const data = await formResponse.json();
-              console.log(`Evento enviado com sucesso via FormData: ${data.id}`);
+            if (response.ok) {
+              const result = await response.json();
+              console.log("Resposta da API:", result);
               sucessos++;
-            } else {
-              throw new Error(`Erro HTTP: ${formResponse.status}`);
+              continue; // Prosseguir para o próximo evento
             }
+          } catch (err) {
+            console.log("Falha ao enviar como FormData, tentando JSON:", err);
           }
-        } catch (error) {
-          console.error(`Erro ao enviar evento ${evento.oque}:`, error);
+          
+          // Tentativa 2: Enviar como JSON
+          try {
+            const response = await fetch(apiUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(evento),
+              mode: 'cors'
+            });
+            
+            if (response.ok) {
+              const result = await response.json();
+              console.log("Resposta da API (JSON):", result);
+              sucessos++;
+              continue; // Prosseguir para o próximo evento
+            }
+          } catch (err) {
+            console.log("Falha ao enviar como JSON:", err);
+          }
+          
+          // Se chegou aqui, ambas as tentativas falharam
           falhas++;
-          mensagens.push(`Falha ao enviar "${evento.oque}": ${error.message}`);
+          mensagens.push(`Não foi possível enviar "${atracao}"`);
+          
+        } catch (error) {
+          console.error("Erro ao processar evento:", error);
+          falhas++;
+          mensagens.push(`Erro ao processar "${card.querySelector('.event-card-title').textContent}": ${error.message}`);
         }
       }
       
-      // Mostrar resultados
+      // Restaurar estado do botão
+      sendButton.disabled = false;
+      sendButton.textContent = 'Enviar para API';
+      
+      // Mostrar feedback final
       if (sucessos > 0) {
-        alert(`${sucessos} eventos enviados com sucesso!`);
+        alert(`${sucessos} evento(s) enviado(s) com sucesso!`);
       }
       
       if (falhas > 0) {
-        alert(`${falhas} eventos não puderam ser enviados:\n${mensagens.join('\n')}`);
+        alert(`${falhas} evento(s) não pôde(puderam) ser enviado(s):\n${mensagens.join('\n')}`);
       }
     }
   </script>
