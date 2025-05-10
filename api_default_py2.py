@@ -3,45 +3,39 @@
 # Versão compatível com Python 2.7 e 3+
 # Adicione este código ao seu arquivo controllers/default.py existente
 
-# Configuração de CORS para permitir requisições do seu domínio local
-def _set_cors_headers():
-    """Define cabeçalhos CORS para permitir requisições de origens externas"""
-    response.headers['Access-Control-Allow-Origin'] = '*'  # Permite de qualquer origem - Restrinja em produção
-    response.headers['Access-Control-Allow-Methods'] = 'POST, GET, OPTIONS, PUT, DELETE'
-    response.headers['Access-Control-Allow-Headers'] = 'Origin, X-Requested-With, Content-Type, Accept, Authorization, X-HTTP-Method-Override'
-    response.headers['Access-Control-Allow-Credentials'] = 'true'
-    response.headers['Access-Control-Max-Age'] = '3600'  # Cache por 1 hora
-    # Adiciona cabeçalho para evitar cache que pode interferir com preflight
-    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, post-check=0, pre-check=0'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '-1'
+# Configuração de CORS - configuração global
+response.headers['Access-Control-Allow-Origin'] = '*'
+response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Requested-With, Authorization'
 
-# Middleware global para aplicar CORS em todas as chamadas
-def cors():
-    if request.env.request_method == 'OPTIONS':
-        _set_cors_headers()
-        raise HTTP(200, **{'Content-Type': 'application/json'})
-    _set_cors_headers()
+# Função auxiliar para aplicar cabeçalhos CORS em cada requisição
+def set_cors_headers():
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Requested-With, Authorization'
 
-# Registrar o middleware para todas as requisições
-from gluon.custom_import import track_changes
-track_changes(True)  # Reload modules
-import gluon.tools as tools
-tools.callback.settings.on_request_start.append(cors)
+# Função auxiliar para obter dados da requisição tanto em JSON quanto form-data
+def get_request_data():
+    data = None
+    try:
+        data = request.json
+    except:
+        data = None
+    if not data:
+        # form-data ou x-www-form-urlencoded fallback
+        data = request.vars or {}
+    return data
 
 # Endpoint OPTIONS para lidar com preflight requests do CORS
-# Precisamos deixar esse endpoint explícito para lidar com OPTIONS em Python 2.7
 def options():
     """Responde a requisições OPTIONS do CORS preflight"""
-    response.view = None
-    _set_cors_headers()
-    return response.json({'status': 'ok'})
+    set_cors_headers()
+    return {}
 
-# Endpoint específico para a rota de eventos com OPTIONS
+# Endpoint específico para OPTIONS na rota /eventos
 def eventos_options():
-    response.view = None
-    _set_cors_headers()
-    return ""
+    set_cors_headers()
+    return {}
 
 # Endpoint principal para receber eventos
 @request.restful()
@@ -52,21 +46,14 @@ def eventos():
     GET: Lista todos os eventos cadastrados
     POST: Adiciona um novo evento
     """
-    # Aplicar cabeçalhos CORS imediatamente para todas as chamadas aqui
-    _set_cors_headers()
-    
     def POST(*args, **vars):
-        # Verifica se a requisição tem corpo JSON
+        # Garantir que os cabeçalhos CORS sejam aplicados
+        set_cors_headers()
+        
         try:
-            # Debug: Logar detalhes da requisição
-            logger.info("Recebida requisição POST com headers: %s", str(request.env.http_headers))
+            # Obter dados da requisição usando a função auxiliar
+            dados = get_request_data()
             
-            # Ler dados do corpo da requisição
-            dados = request.json
-            if not dados:
-                # Tentar ler do formulário se não houver dados JSON
-                dados = request.post_vars
-                
             if not dados:
                 return response.json({'error': 'Nenhum dado recebido'}, status=400)
             
@@ -117,6 +104,9 @@ def eventos():
             }, status=500)
     
     def GET(*args, **vars):
+        # Garantir que os cabeçalhos CORS sejam aplicados
+        set_cors_headers()
+        
         # Lista eventos limitados aos 100 mais recentes
         eventos = db(db.t_eventos).select(
             orderby=~db.t_eventos.f_data_cadastro,
@@ -134,42 +124,24 @@ def eventos():
                        for e in eventos]
         })
     
-    # Retorna apenas estes métodos
+    def OPTIONS(*args, **vars):
+        # Garantir que os cabeçalhos CORS sejam aplicados
+        set_cors_headers()
+        return {}
+    
+    # Retorna todos os métodos, incluindo OPTIONS
     return locals()
 
-# Definir rotas explícitas para OPTIONS
-# Esta é uma solução comum para problemas de CORS em Web2py + Python 2.7
+# Configurar rota OPTIONS para /eventos/default/eventos
+# Esta é a chave para o funcionamento em Python 2.7
 def _():
-    """Roteamento especial para OPTIONS"""
-    patterns = [
-        ('/eventos/default/eventos', eventos_options)
-    ]
     from gluon.custom_import import track_changes
     track_changes(True)
     import gluon.http
-    for pattern, action in patterns:
-        gluon.http.parse_options_uri(pattern, action)
-
-# Modelo de dados necessário para o web2py
-# Adicione isto ao seu models/db.py ou crie um arquivo models/eventos.py
-
-"""
-# Definição da tabela eventos no banco de dados
-db.define_table('t_eventos',
-    Field('f_oque', 'string', required=True, label='O quê'),
-    Field('f_quando', 'string', required=True, label='Quando'),
-    Field('f_onde', 'string', required=True, label='Onde'),
-    Field('f_fonte', 'string', required=True, label='Fonte'),
-    Field('f_local', 'string', required=True, label='Local'),
-    Field('f_imagem', 'text', label='Imagem'),
-    Field('f_endereco', 'string', label='Endereço'),
-    Field('f_preco', 'string', label='Preço'),
-    Field('f_descricao', 'text', label='Descrição'),
-    Field('f_tipo', 'string', label='Tipo de Evento'),
-    Field('f_data_cadastro', 'datetime', default=request.now, label='Data de Cadastro')
-"""
+    gluon.http.parse_options_uri('/eventos/default/eventos', eventos_options)
 
 # Para testar o funcionamento, você pode adicionar esta rota:
 def api_teste():
     """Página para testar a API de eventos"""
+    set_cors_headers()  # Aplicar CORS mesmo na página de teste
     return dict(message="API de eventos está funcionando corretamente")

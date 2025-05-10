@@ -830,272 +830,124 @@
     }
       // Enviar eventos selecionados para a API
     async function enviarEventos() {
-      const eventosElems = document.querySelectorAll('.evento-item');
-      if (eventosElems.length === 0) {
+      // Coletar todos os eventos das cards
+      const eventCards = document.querySelectorAll('.event-card');
+      if (eventCards.length === 0) {
         alert("Nenhum evento detectado para enviar.");
         return;
       }
     
-      const apiUrl = 'https://mtcporto2.pythonanywhere.com/eventos/default/eventos';
       const eventos = [];
-    
-      // Coletar todos os eventos
-      eventosElems.forEach(eventoElem => {
+      eventCards.forEach(card => {
+        // Verifica se o checkbox está marcado
+        const checkbox = card.querySelector('input[type="checkbox"]');
+        if (!checkbox || !checkbox.checked) return;
+        
+        // Extrair dados do card
         const evento = {
-          oque: eventoElem.querySelector('.atracao-valor').textContent,
-          quando: `${eventoElem.querySelector('.data-valor').textContent} ${eventoElem.querySelector('.hora-valor').textContent}`,
-          onde: eventoElem.querySelector('.cidade-valor').textContent,
-          fonte: eventoElem.querySelector('.fonte-valor').textContent,
-          local: eventoElem.querySelector('.local-valor').textContent,
-          tipo: eventoElem.querySelector('.tipo-valor').textContent,
-          endereco: eventoElem.querySelector('.local-valor').textContent // Usando local como endereço também
+          oque: card.querySelector('.event-card-title').textContent,
+          quando: card.querySelector('.event-card-date').textContent + ' ' + 
+                 (card.querySelector('.event-card-item-value')?.textContent || ''),
+          onde: Array.from(card.querySelectorAll('.event-card-item-label'))
+                .find(el => el.textContent === 'Cidade:')
+                ?.nextElementSibling?.textContent || 'João Pessoa',
+          fonte: Array.from(card.querySelectorAll('.event-card-item-label'))
+                .find(el => el.textContent === 'Fonte:')
+                ?.nextElementSibling?.textContent || '',
+          local: Array.from(card.querySelectorAll('.event-card-item-label'))
+                .find(el => el.textContent === 'Local:')
+                ?.nextElementSibling?.textContent || ''
         };
+        
+        // Adicionar campos opcionais se existirem
+        const endereco = Array.from(card.querySelectorAll('.event-card-item-label'))
+                        .find(el => el.textContent === 'Endereço:')
+                        ?.nextElementSibling?.textContent;
+        if (endereco) evento.endereco = endereco;
+        
+        const preco = Array.from(card.querySelectorAll('.event-card-item-label'))
+                    .find(el => el.textContent === 'Preço:')
+                    ?.nextElementSibling?.textContent;
+        if (preco) evento.preco = preco;
+        
+        const tipo = Array.from(card.querySelectorAll('.event-card-item-label'))
+                    .find(el => el.textContent === 'Tipo:')
+                    ?.nextElementSibling?.textContent;
+        if (tipo) evento.tipo = tipo;
+        
+        const descricao = Array.from(card.querySelectorAll('.event-card-item-label'))
+                        .find(el => el.textContent === 'Descrição:')
+                        ?.nextElementSibling?.textContent;
+        if (descricao) evento.descricao = descricao;
+        
         eventos.push(evento);
       });
-    
-      console.log("Enviando eventos:", eventos);
-    
-      // Resultados de sucesso e falha
+      
+      if (eventos.length === 0) {
+        alert("Nenhum evento selecionado para envio.");
+        return;
+      }
+      
+      console.log("Eventos a serem enviados:", eventos);
+      
+      // URL da API
+      const apiUrl = 'https://mtcporto2.pythonanywhere.com/eventos/default/eventos';
+      
+      // Resultados
       let sucessos = 0;
       let falhas = 0;
-      let mensagensErro = [];
-    
-      // Enviar cada evento individualmente com strategy pattern
+      let mensagens = [];
+      
+      // Enviar cada evento individualmente
       for (const evento of eventos) {
         try {
-          let enviado = false;
+          // Enviar como JSON - abordagem simples que funciona em seu outro projeto
+          const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(evento)
+          });
           
-          // Estratégia 1: FormData com submissão normal
-          try {
+          if (response.ok) {
+            const data = await response.json();
+            console.log(`Evento enviado com sucesso: ${data.id}`);
+            sucessos++;
+          } else {
+            // Se falhar com JSON, tentar com FormData
             const formData = new FormData();
-            for (const [key, value] of Object.entries(evento)) {
+            Object.entries(evento).forEach(([key, value]) => {
               formData.append(key, value);
-            }
+            });
             
-            const response = await fetch(apiUrl, {
+            const formResponse = await fetch(apiUrl, {
               method: 'POST',
               body: formData
             });
             
-            if (response.ok) {
-              const data = await response.json();
+            if (formResponse.ok) {
+              const data = await formResponse.json();
               console.log(`Evento enviado com sucesso via FormData: ${data.id}`);
               sucessos++;
-              enviado = true;
-            }
-          } catch (err) {
-            console.error("Falha na estratégia FormData:", err);
-          }
-    
-          // Estratégia 2: JSON direto
-          if (!enviado) {
-            try {
-              const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'X-Requested-With': 'XMLHttpRequest'
-                },
-                body: JSON.stringify(evento),
-                mode: 'cors'
-              });
-              
-              if (response.ok) {
-                const data = await response.json();
-                console.log(`Evento enviado com sucesso via JSON: ${data.id}`);
-                sucessos++;
-                enviado = true;
-              }
-            } catch (err) {
-              console.error("Falha na estratégia JSON:", err);
+            } else {
+              throw new Error(`Erro HTTP: ${formResponse.status}`);
             }
           }
-          
-          // Estratégia 3: JSONP via script tag
-          if (!enviado) {
-            try {
-              await new Promise((resolve, reject) => {
-                // Criar callback global temporário
-                const callbackName = `jsonpCallback_${Date.now()}`;
-                window[callbackName] = function(data) {
-                  if (data && data.status === "success") {
-                    console.log(`Evento enviado com sucesso via JSONP: ${data.id}`);
-                    sucessos++;
-                    resolve(data);
-                  } else {
-                    reject(new Error("Resposta JSONP inválida"));
-                  }
-                  // Limpar callback global
-                  delete window[callbackName];
-                };
-                
-                // Criar URL com parâmetros codificados
-                const params = new URLSearchParams();
-                for (const [key, value] of Object.entries(evento)) {
-                  params.append(key, value);
-                }
-                params.append('callback', callbackName);
-                
-                // Criar e adicionar script tag
-                const script = document.createElement('script');
-                script.src = `${apiUrl}?${params.toString()}`;
-                script.onerror = function() {
-                  reject(new Error("Erro ao carregar script JSONP"));
-                  document.body.removeChild(script);
-                  delete window[callbackName];
-                };
-                document.body.appendChild(script);
-                
-                // Timeout para evitar que fique pendurado
-                setTimeout(() => {
-                  if (window[callbackName]) {
-                    delete window[callbackName];
-                    document.body.contains(script) && document.body.removeChild(script);
-                    reject(new Error("Timeout na requisição JSONP"));
-                  }
-                }, 10000); // 10 segundos de timeout
-              });
-              
-              enviado = true;
-            } catch (err) {
-              console.error("Falha na estratégia JSONP:", err);
-            }
-          }
-          
-          // Estratégia 4: Proxy CORS
-          if (!enviado) {
-            const corsProxies = [
-              'https://corsproxy.io/?',
-              'https://api.allorigins.win/get?url='
-            ];
-            
-            for (const proxy of corsProxies) {
-              if (enviado) break;
-              
-              try {
-                const encodedUrl = encodeURIComponent(apiUrl);
-                const response = await fetch(`${proxy}${encodedUrl}`, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest'
-                  },
-                  body: JSON.stringify(evento)
-                });
-                
-                if (response.ok) {
-                  const data = await response.json();
-                  if (data && (data.status === "success" || data.contents)) {
-                    console.log(`Evento enviado com sucesso via proxy CORS: ${proxy}`);
-                    sucessos++;
-                    enviado = true;
-                  }
-                }
-              } catch (err) {
-                console.error(`Falha no proxy CORS ${proxy}:`, err);
-              }
-            }
-          }
-          
-          // Estratégia 5: iframe com POST
-          if (!enviado) {
-            try {
-              await new Promise((resolve, reject) => {
-                // Criar formulário temporário e iframe
-                const iframeId = `iframe_post_${Date.now()}`;
-                const iframe = document.createElement('iframe');
-                iframe.name = iframeId;
-                iframe.style.display = 'none';
-                document.body.appendChild(iframe);
-                
-                const form = document.createElement('form');
-                form.action = apiUrl;
-                form.method = 'POST';
-                form.target = iframeId;
-                form.style.display = 'none';
-                
-                // Adicionar campos do evento
-                for (const [key, value] of Object.entries(evento)) {
-                  const input = document.createElement('input');
-                  input.type = 'hidden';
-                  input.name = key;
-                  input.value = value;
-                  form.appendChild(input);
-                }
-                
-                document.body.appendChild(form);
-                
-                // Handler para quando o iframe carregar
-                iframe.onload = function() {
-                  try {
-                    // Verificar se conseguimos acessar o conteúdo (isso pode falhar por causa de CORS)
-                    const iframeContent = iframe.contentDocument || iframe.contentWindow.document;
-                    const responseText = iframeContent.body.innerText;
-                    
-                    if (responseText && responseText.includes("success")) {
-                      console.log("Evento enviado com sucesso via iframe POST");
-                      sucessos++;
-                      resolve(true);
-                    } else {
-                      // Se não conseguirmos ler o conteúdo, assumimos sucesso
-                      console.log("Resposta do iframe recebida, assumindo sucesso");
-                      sucessos++;
-                      resolve(true);
-                    }
-                  } catch (e) {
-                    // Se ocorrer erro de segurança CORS, assumimos que o envio foi bem-sucedido
-                    console.log("Não foi possível ler resposta do iframe (provavelmente devido a CORS)");
-                    sucessos++;
-                    resolve(true);
-                  }
-                  
-                  // Limpar resources
-                  setTimeout(() => {
-                    document.body.removeChild(form);
-                    document.body.removeChild(iframe);
-                  }, 1000);
-                };
-                
-                // Handler para timeout
-                setTimeout(() => {
-                  if (document.body.contains(form)) {
-                    console.log("Timeout no envio via iframe, ainda assumindo sucesso");
-                    document.body.removeChild(form);
-                    document.body.removeChild(iframe);
-                    resolve(true);
-                  }
-                }, 10000);
-                
-                // Enviar o formulário
-                form.submit();
-              });
-              
-              enviado = true;
-            } catch (err) {
-              console.error("Falha na estratégia iframe:", err);
-            }
-          }
-          
-          // Se todas as estratégias falharem
-          if (!enviado) {
-            falhas++;
-            mensagensErro.push(`Não foi possível enviar o evento: ${evento.oque}`);
-          }
-          
         } catch (error) {
-          console.error("Erro ao enviar eventos:", error);
+          console.error(`Erro ao enviar evento ${evento.oque}:`, error);
           falhas++;
-          mensagensErro.push(`Erro ao enviar: ${evento.oque} - ${error.message}`);
+          mensagens.push(`Falha ao enviar "${evento.oque}": ${error.message}`);
         }
       }
-    
-      // Exibir resultados
+      
+      // Mostrar resultados
       if (sucessos > 0) {
-        alert(`Sucesso! ${sucessos} de ${eventos.length} eventos foram enviados.`);
-      } 
+        alert(`${sucessos} eventos enviados com sucesso!`);
+      }
       
       if (falhas > 0) {
-        alert(`Atenção: ${falhas} eventos não puderam ser enviados.\n${mensagensErro.join('\n')}`);
+        alert(`${falhas} eventos não puderam ser enviados:\n${mensagens.join('\n')}`);
       }
     }
   </script>
