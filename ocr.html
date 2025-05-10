@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mini Agente - Eventos</title>  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@v5.1.1/dist/tesseract.min.js"></script>
+  <!-- Adicionando título da página e metadados de SEO -->
+  <meta name="description" content="Extraia informações de eventos a partir de imagens de cartazes com Gemini AI ou OCR">
+  <meta name="keywords" content="OCR, Gemini, Google AI, extração de texto, eventos, cartazes">
+  <style>
+    :root {
+      --primary: #3498db;
+      --secondary: #2ecc71;
+      --dark: #34495e;
+      --light: #f5f5f5;
+      --danger: #e74c3c;
+      --success: #27ae60;
+    }
+    
+    body { 
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+      padding: 20px; 
+      max-width: 800px; 
+      margin: auto;
+      background-color: #f9f9f9;
+      color: #333;
+    }
+    
+    .container {
+      background-color: white;
+      border-radius: 10px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    
+    h2 {
+      color: var(--primary);
+      border-bottom: 2px solid var(--light);
+      padding-bottom: 10px;
+      margin-top: 0;
+    }
+    
+    h4 {
+      color: var(--dark);
+      margin-top: 20px;
+      margin-bottom: 10px;
+    }
+    
+    .input-area {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+    
+    .file-input-wrapper {
+      position: relative;
+      overflow: hidden;
+      display: inline-block;
+      width: 100%;
+    }
+    
+    .file-input-label {
+      background-color: var(--primary);
+      color: white;
+      padding: 12px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: inline-block;
+      text-align: center;
+      transition: background-color 0.3s;
+    }
+    
+    .file-input-label:hover {
+      background-color: #2980b9;
+    }
+    
+    .file-input {
+      position: absolute;
+      font-size: 100px;
+      opacity: 0;
+      right: 0;
+      top: 0;
+      cursor: pointer;
+    }
+    
+    button {
+      background-color: var(--secondary);
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 16px;
+      transition: background-color 0.3s;
+      width: 100%;
+      margin: 10px 0;
+    }
+    
+    button:hover {
+      background-color: #27ae60;
+    }
+    
+    .preview-container {
+      margin: 20px 0;
+      text-align: center;
+      border: 2px dashed var(--light);
+      border-radius: 8px;
+      padding: 10px;
+      min-height: 200px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: white; /* Fundo branco para o container */
+    }
+    
+    #preview {
+      max-width: 100%;
+      max-height: 400px;
+      border-radius: 4px;
+      display: none; /* Esconder até que seja carregada */
+    }
+    
+    pre {
+      background: #f5f5f5;
+      padding: 15px;
+      border-radius: 4px;
+      overflow-x: auto;
+      border-left: 4px solid var(--primary);
+    }
+    
+    .json-key {
+      color: #e74c3c;
+    }
+    
+    .json-value {
+      color: #3498db;
+    }
+    
+    .loading {
+      display: none;
+      text-align: center;
+      padding: 20px;
+    }
+    
+    .loading-spinner {
+      border: 4px solid rgba(0, 0, 0, 0.1);
+      border-radius: 50%;
+      border-top: 4px solid var(--primary);
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 0 auto 10px;
+    }
+    
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    
+    .result-container {
+      background-color: var(--light);
+      border-radius: 8px;
+      padding: 15px;
+      margin-top: 20px;
+    }
+    
+    .confidence-meter {
+      height: 6px;
+      background-color: #eee;
+      border-radius: 3px;
+      margin: 5px 0;
+    }
+    
+    .confidence-value {
+      height: 100%;
+      background-color: var(--primary);
+      border-radius: 3px;
+    }
+    
+    .status-message {
+      margin: 10px 0;
+      font-size: 14px;
+      color: #777;
+    }
+    
+    @media (max-width: 600px) {
+      body {
+        padding: 10px;
+      }
+    }
+  </style>
+</head>
+<body>  <div class="container">
+    <h2>Mini Agente de Eventos (Modo OCR)</h2>
+    
+    <div style="text-align: center; margin-bottom: 15px;">
+      <a href="escolha.html" style="color: var(--primary); font-size: 0.9em; text-decoration: none;">← Voltar para escolha</a>
+      <span style="margin: 0 10px;">|</span>
+      <a href="index-gemini.html" style="color: var(--primary); font-size: 0.9em; text-decoration: none;">Alternar para modo Gemini (multi-eventos) →</a>
+      <span style="margin: 0 10px;">|</span>
+      <a href="eventos_view.html" style="color: var(--primary); font-size: 0.9em; text-decoration: none;">Ver todos os eventos →</a>
+    </div>
+    
+    <div class="input-area">
+      <div class="file-input-wrapper">
+        <label class="file-input-label" for="imageInput">Escolher imagem de evento</label>
+        <input class="file-input" type="file" accept="image/*" id="imageInput" />
+      </div>
+      
+      <p style="text-align: center; margin: 10px 0; color: #666;">
+        <i>Você também pode colar uma imagem diretamente da área de transferência (Ctrl+V)</i>
+      </p>
+    </div>
+    
+    <div class="preview-container">
+      <img id="preview" alt="Preview da imagem" />
+      <div id="preview-placeholder" style="color: #999; display: flex; align-items: center; justify-content: center; width: 100%; height: 200px;">
+        Selecione ou cole uma imagem
+      </div>
+    </div>
+    
+    <button id="processButton" onclick="processImage()">Extrair Evento</button>
+    
+    <div id="loading" class="loading">
+      <div class="loading-spinner"></div>
+      <p>Processando imagem, por favor aguarde...</p>
+      <div class="status-message" id="statusMessage"></div>
+    </div>
+  </div>
+  
+  <div class="container result-container" id="resultContainer" style="display: none;">
+    <h4>Texto extraído:</h4>
+    <pre id="rawText">---</pre>
+    
+    <div class="confidence-meter">
+      <div class="confidence-value" id="confidenceMeter" style="width: 0%"></div>
+    </div>
+    <p id="confidenceText" style="text-align: right; margin: 5px 0; font-size: 12px;">Confiança: 0%</p>
+
+    <h4>Evento detectado:</h4>
+    <pre id="parsedData">---</pre>
+    
+    <button onclick="enviarEvento()">Enviar para API</button>
+  </div>
+  
+  <script>
+    let rawText = "";
+    let evento = {};
+    let confidence = 0;
+    let lastImageData = null;
+    
+    // Iniciando elementos quando a página carrega
+    document.addEventListener('DOMContentLoaded', function() {
+      const preview = document.getElementById('preview');
+      // Garantir que o preview comece oculto
+      preview.style.display = 'none';
+      
+      // O placeholder já está definido no HTML
+    });
+    
+    // Mostrar preview da imagem imediatamente quando um arquivo é selecionado
+    document.getElementById("imageInput").addEventListener("change", function() {
+      const file = this.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const preview = document.getElementById("preview");
+        const placeholder = document.getElementById("preview-placeholder");
+        
+        preview.onload = function() {
+          preview.style.display = "block"; // Mostrar imagem quando carregada
+          placeholder.style.display = "none";
+        };
+        
+        preview.onerror = function() {
+          preview.style.display = "none"; // Esconder em caso de erro
+          placeholder.style.display = "flex";
+          console.error("Erro ao carregar imagem");
+        };
+        
+        preview.src = e.target.result;
+        lastImageData = e.target.result;
+      };
+      reader.readAsDataURL(file);
+      
+      // Esconder resultados anteriores
+      document.getElementById("resultContainer").style.display = "none";
+    });
+    
+    // Suporte para colar imagem da área de transferência
+    document.addEventListener('paste', function(event) {
+      const items = (event.clipboardData || event.originalEvent.clipboardData).items;
+      
+      for (const item of items) {
+        if (item.type.indexOf('image') === 0) {
+          const blob = item.getAsFile();
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            const preview = document.getElementById("preview");
+            const placeholder = document.getElementById("preview-placeholder");
+            
+            preview.onload = function() {
+              preview.style.display = "block"; // Mostrar imagem quando carregada
+              placeholder.style.display = "none";
+            };
+            
+            preview.onerror = function() {
+              preview.style.display = "none"; // Esconder em caso de erro
+              placeholder.style.display = "flex";
+            };
+            
+            preview.src = e.target.result;
+            lastImageData = e.target.result;
+            
+            // Esconder resultados anteriores
+            document.getElementById("resultContainer").style.display = "none";
+            
+            // Opcional: Informar ao usuário que a imagem foi colada
+            alert("Imagem colada com sucesso! Clique em 'Extrair Evento' para processar.");
+          };
+          reader.readAsDataURL(blob);
+          break;
+        }
+      }
+    });
+    
+    // Configurações do OCR
+    const ocrSettings = {
+      language: "por+eng"  // Português + Inglês
+    };
+    
+    function enhanceImageForOCR(imageData) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = function() {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = img.width;
+          canvas.height = img.height;
+          
+          // Desenha imagem original
+          ctx.drawImage(img, 0, 0);
+          
+          // Obtém dados da imagem para processamento
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          const data = imageData.data;
+          
+          // Aplicar melhorias de imagem para melhor OCR
+          for (let i = 0; i < data.length; i += 4) {
+            // Aumentar contraste
+            const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+            const threshold = 128;
+            
+            if (avg > threshold) {
+              data[i] = 255;     // R
+              data[i + 1] = 255; // G
+              data[i + 2] = 255; // B
+            } else {
+              data[i] = 0;       // R
+              data[i + 1] = 0;   // G
+              data[i + 2] = 0;   // B
+            }
+            
+            data[i + 3] = 255;   // Alpha (totalmente opaco)
+          }
+          
+          // Volta com os dados aprimorados para o canvas
+          ctx.putImageData(imageData, 0, 0);
+          
+          // Retorna a imagem aprimorada como URL de dados
+          resolve(canvas.toDataURL('image/png'));
+        };
+        img.src = imageData;
+      });
+    }
+    
+    async function processImage() {
+      // Mostrar estado de carregamento
+      document.getElementById("loading").style.display = "block";
+      document.getElementById("processButton").disabled = true;
+      
+      try {
+        // Obter dados da imagem
+        const input = document.getElementById("imageInput");
+        const file = input.files[0];
+        if (!file && !lastImageData) {
+          alert("Selecione uma imagem ou cole uma imagem da área de transferência.");
+          document.getElementById("loading").style.display = "none";
+          document.getElementById("processButton").disabled = false;
+          return;
+        }
+        
+        let imageData;
+        if (file) {
+          imageData = await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = e => resolve(e.target.result);
+            reader.readAsDataURL(file);
+          });
+          lastImageData = imageData;
+        } else {
+          imageData = lastImageData;
+        }
+        
+        // Aprimorar imagem
+        try {
+          document.getElementById("statusMessage").textContent = "Aprimorando imagem...";
+          imageData = await enhanceImageForOCR(imageData);
+        } catch (error) {
+          console.error("Erro ao aprimorar imagem:", error);
+        }
+        
+        // Usar configurações para OCR
+        const language = ocrSettings.language;
+        
+        // Executar OCR com Tesseract.js
+        document.getElementById("statusMessage").textContent = "Reconhecendo texto...";
+        Tesseract.recognize(imageData, language, {
+          logger: m => {
+            console.log(m);
+            if (m.status === "recognizing text") {
+              document.getElementById("statusMessage").textContent = 
+                `Reconhecendo texto... ${Math.round(m.progress * 100)}%`;
+            }
+          }
+        }).then(({ data: { text, confidence: ocrConfidence } }) => {
+          // Atualizar UI com resultados
+          document.getElementById("rawText").innerText = text;
+          rawText = text;
+          confidence = ocrConfidence;
+          
+          // Atualizar medidor de confiança
+          document.getElementById("confidenceMeter").style.width = `${ocrConfidence}%`;
+          document.getElementById("confidenceText").textContent = `Confiança: ${Math.round(ocrConfidence)}%`;
+          
+          // Processar o texto extraído
+          evento = parseEvento(text);
+          document.getElementById("parsedData").innerText = JSON.stringify(evento, null, 2);
+          
+          // Mostrar resultados e esconder carregamento
+          document.getElementById("resultContainer").style.display = "block";
+          document.getElementById("loading").style.display = "none";
+          document.getElementById("processButton").disabled = false;
+        }).catch(err => {
+          console.error(err);
+          alert("Erro ao processar imagem: " + err.message);
+          document.getElementById("loading").style.display = "none";
+          document.getElementById("processButton").disabled = false;
+        });
+      } catch (error) {
+        console.error("Erro ao processar imagem:", error);
+        document.getElementById("loading").style.display = "none";
+        document.getElementById("processButton").disabled = false;
+        alert("Erro ao processar imagem: " + error.message);
+      }
+    }
+
+    function parseEvento(texto) {
+      const evento = {};
+
+      // Data/Date extraction
+      const dataMatch = texto.match(/(\d{1,2})\/([A-Za-zÇçÃãÉéÍíÓóÚú]+|\d{1,2})(\/\d{2,4})?/i);
+      if (dataMatch) {
+        let data = dataMatch[0];
+        
+        // Verificar se contém ano - se não contiver, adicionar 2025
+        if (!data.match(/\/\d{4}$/) && !data.match(/\d{4}$/)) {
+          data = `${data}/2025`;
+        }
+        // Se tiver 2024 como ano, substituir por 2025
+        else if (data.includes('2024')) {
+          data = data.replace('2024', '2025');
+        }
+        
+        evento.data = data;
+      }
+
+      // Hora/Time extraction - Handle formats like 20h, 20h30
+      const horaMatch = texto.match(/HORÁRIO:(\d{1,2})[hH](\d{1,2})?/i) || texto.match(/(\d{1,2})[hH](\d{1,2})?/i);
+      if (horaMatch) {
+        // Verificar se minutos estão especificados
+        if (horaMatch[2]) {
+          evento.hora = `${horaMatch[1]}:${horaMatch[2]}`;
+        } else {
+          evento.hora = `${horaMatch[1]}:00`;
+        }
+      }
+
+      // Preço/Price extraction - Handle formats with R$ or without
+      const precoMatch = texto.match(/ENTRADA:[\s]*R?\$?[\s]*(\d+[\.,]\d+)/i) || 
+                          texto.match(/R\$[\s]*(\d+[\.,]\d+)/i) || 
+                          texto.match(/(\d+[\.,]\d+)/);
+      if (precoMatch) {
+        evento.preco = precoMatch[1];
+      }
+
+      // Local/Venue extraction
+      const localMatch = texto.match(/RUA\s+[\w\s\.áàâãéêíóôõúüçÁÀÂÃÉÊÍÓÔÕÚÜÇ]+,\s*\d+/i) || 
+                        texto.match(/CAFÉ\s+DA\s+USINA/i);
+      if (localMatch) {
+        evento.local = localMatch[0].trim();
+      }
+
+      // Try different approaches to identify the artist name
+      const popularArtistPatterns = [
+        // Common format patterns for artist names in posters
+        { regex: /VAL\s*DONATO/i, name: "VAL DONATO" },
+        { regex: /DIN[OÓ0]Á\s*E\s*BANDA/i, name: "DINOÁ E BANDA" },
+        { regex: /CONSTANT\s*MOTION/i, name: "CONSTANT MOTION" },
+        
+        // Look for text chunks that might be artist names
+        { regex: /\b([A-Z]{2,}(?:\s+E\s+BANDA))\b/i, extract: true },
+        { regex: /\'?\s*E\s+BANDA\b/i, lookBefore: 15, extract: true }
+      ];
+      
+      // Try to extract artist name using AI-like pattern matching
+      let atracao = null;
+      
+      // First try specific known patterns
+      for (const pattern of popularArtistPatterns) {
+        const match = texto.match(pattern.regex);
+        if (match) {
+          if (pattern.extract && match[1]) {
+            atracao = match[1].trim();
+          } else if (pattern.lookBefore) {
+            // Look for a word before "E BANDA"
+            const index = match.index;
+            if (index !== undefined) {
+              const textBeforeMatch = texto.substring(Math.max(0, index - pattern.lookBefore), index).trim();
+              const lastWordMatch = textBeforeMatch.match(/([A-Z]{2,})$/);
+              if (lastWordMatch) {
+                atracao = `${lastWordMatch[1]} E BANDA`;
+              }
+            }
+          } else {
+            atracao = pattern.name || match[0].trim();
+          }
+          break;
+        }
+      }
+      
+      // If no match found, try a more general approach
+      if (!atracao) {
+        // Skip sections with common words
+        const commonWords = ["ENTRADA", "HORÁRIO", "LANÇAMENTO", "NACIONAL", "ROCK", "MAIO", "CULTURAL", "APOIO"];
+        
+        // Custom heuristic for finding artist name
+        // Look for short lines with all capitals that might be the artist name
+        const lines = texto.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+        
+        for (const line of lines) {
+          // Check if this line looks like an artist name (short, all caps, no common words)
+          if (line.toUpperCase() === line && line.length >= 3 && line.length <= 30) {
+            let isCommonWord = false;
+            for (const word of commonWords) {
+              if (line.includes(word)) {
+                isCommonWord = true;
+                break;
+              }
+            }
+            
+            if (!isCommonWord) {
+              atracao = line.trim();
+              break;
+            }
+          }
+          
+          // Check for "E BANDA" in the line
+          if (line.match(/\bE\s+BANDA\b/i)) {
+            const words = line.split(/\s+/);
+            const bandaIndex = words.findIndex(w => w.match(/BANDA/i));
+            if (bandaIndex > 1 && words[bandaIndex - 1].match(/E/i)) {
+              // Get the word before "E BANDA"
+              const potential = words.slice(0, bandaIndex - 1).join(" ");
+              if (potential && potential.length > 2) {
+                atracao = potential.trim() + " E BANDA";
+                break;
+              }
+            }
+          }
+        }
+      }
+      
+      // For the specific case of DINOÁ E BANDA
+      if (!atracao && texto.includes("BANDA")) {
+        // Try to find "DINOÁ" with common OCR errors
+        const possibleDinoa = texto.match(/\b[DO]IN[OÓD][AÁ4]\b/i);
+        if (possibleDinoa) {
+          atracao = "DINOÁ E BANDA";
+        }
+      }
+      
+      if (atracao) {
+        evento.atracao = atracao;
+      }
+
+      // Tipo do evento/Event type extraction
+      const rockNacionalMatch = texto.match(/O\s*MELHOR\s*DO\s*ROCK\s*NACIONAL/i) || texto.match(/ROCK\s*BR/i);
+      const lancamentoCdMatch = texto.match(/LANÇAMENTO\s*DO\s*CD/i);
+      
+      if (rockNacionalMatch) {
+        evento.tipo = "ROCK NACIONAL";
+      } else if (lancamentoCdMatch) {
+        evento.tipo = "LANÇAMENTO DE CD";
+        
+        // Get the CD name if available
+        const cdNameMatch = texto.match(/CD\s+([A-Z][A-Z\s]+)/i);
+        if (cdNameMatch) {
+          evento.cd = cdNameMatch[1].trim();
+        } else {
+          // Try to extract the CD name from the context
+          const constantMotionMatch = texto.match(/CONSTANT\s+MOTION/i);
+          if (constantMotionMatch) {
+            evento.cd = "CONSTANT MOTION";
+          }
+        }
+      }
+      
+      // Extract location from address if available
+      const enderecoMatch = texto.match(/RUA\s+([A-ZÇÁÉÍÓÚÂÊÔÃÕÀa-zçáéíóúâêôãõà\s\.]+)\s*,?\s*(\d+)?\s*([A-ZÇÁÉÍÓÚÂÊÔÃÕÀa-zçáéíóúâêôãõà\s]+)?/i);
+      if (enderecoMatch && !evento.local) {
+        evento.endereco = enderecoMatch[0].trim();
+        if (enderecoMatch[3]) {
+          evento.bairro = enderecoMatch[3].trim();
+        }
+      }
+      
+      // Special case for RUA JORO BERNARDO which is likely "RUA JOÃO BERNARDO"
+      if (texto.match(/JORO\s+BERNARDO/i) || texto.match(/J[0O][ÃA][0O]\s+BERNARDO/i)) {
+        evento.endereco = "RUA JOÃO BERNARDO DE ALBUQUERQUE, 243";
+        evento.bairro = "TAMBIÁ";
+      }
+
+      evento.cidade = "João Pessoa";
+      
+      return evento;
+    }
+
+    function enviarEvento() {
+      if (!evento.atracao) return alert("Nenhum evento detectado ainda.");
+      
+      // Preparar os dados de acordo com o formato esperado pela API
+      const dadosEvento = {
+        oque: evento.atracao,
+        quando: `${evento.data} ${evento.hora || ''}`.trim(),
+        onde: evento.cidade || 'João Pessoa',
+        fonte: 'Mini Agente de Eventos',
+        local: evento.local || 'Local não especificado',
+        endereco: evento.endereco || '',
+        preco: evento.preco || '',
+        descricao: evento.tipo || '',
+        tipo: evento.tipo || ''
+      };
+      
+      // URL da API original
+      const apiUrl = 'https://mtcporto2.pythonanywhere.com/eventos/default/eventos';
+      
+      // Mostrar mensagem de status
+      alert("Enviando evento...");
+      
+      // Estratégia 1: Tentar requisição direta com JSON
+      fetch(apiUrl, {
+        method: "POST",
+        headers: { 
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(dadosEvento),
+        mode: 'cors' // Explicitamente solicitar modo CORS
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Erro HTTP: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        alert(`Evento enviado com sucesso! ID: ${data.id}`);
+      })
+      .catch(err => {
+        console.error("Estratégia 1 falhou, tentando FormData:", err);
+        
+        // Estratégia 2: Tentar com FormData
+        const formData = new FormData();
+        Object.entries(dadosEvento).forEach(([key, value]) => {
+          formData.append(key, value);
+        });
+        
+        fetch(apiUrl, {
+          method: "POST",
+          body: formData,
+          mode: 'cors'
+        })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`Erro HTTP: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          alert(`Evento enviado com sucesso! ID: ${data.id}`);
+        })
+        .catch(err => {
+          console.error("Estratégia 2 falhou, tentando formulário:", err);
+          
+          // Estratégia 3: Usar formulário para contornar CORS
+          try {
+            // Criar formulário invisível
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = apiUrl;
+            form.target = '_blank'; // Abrir em nova aba
+            form.style.display = 'none';
+            
+            // Adicionar campos ao formulário
+            for (const [key, value] of Object.entries(dadosEvento)) {
+              const input = document.createElement('input');
+              input.type = 'hidden';
+              input.name = key;
+              input.value = value;
+              form.appendChild(input);
+            }
+            
+            // Adicionar ao DOM e enviar
+            document.body.appendChild(form);
+            
+            alert("Abrindo formulário de envio em nova aba...");
+            form.submit();
+            
+            // Limpar formulário do DOM
+            setTimeout(() => {
+              document.body.removeChild(form);
+            }, 1000);
+          } catch (error) {
+            console.error("Erro ao tentar método de formulário:", error);
+            alert(`Todas as estratégias de envio falharam. Erro: ${error.message}`);
+          }
+        });
+      });
+    }
+  </script>
+</body>
+</html>

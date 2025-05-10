@@ -1,6 +1,6 @@
 # Mini Agente de Eventos
 
-![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
 ![Status](https://img.shields.io/badge/status-active-success.svg)
 
 > Um aplicativo web para extrair automaticamente informações de pôsteres de eventos culturais usando OCR (Reconhecimento Óptico de Caracteres) ou IA Generativa (Google Gemini).
@@ -12,7 +12,6 @@
 - [Tecnologias Utilizadas](#tecnologias)
 - [Como Usar](#como-usar)
 - [Versões Disponíveis](#versões)
-- [Configuração Avançada](#configuração-avançada)
 - [API de Integração](#api)
 - [Limitações Atuais](#limitações)
 - [Próximos Passos](#próximos-passos)
@@ -31,11 +30,11 @@ O **Mini Agente de Eventos** é uma aplicação web projetada para extrair infor
 - 🧠 **Processamento Inteligente**: Algoritmos e IA para reconhecer padrões de eventos brasileiros
 - 🖼️ **Pré-processamento de Imagem**: Aprimoramento automático para melhorar resultados do OCR
 - 🤖 **Análise com IA Generativa**: Processamento avançado com Google Gemini
-- 📊 **Medidor de Confiança**: Visualização da precisão do reconhecimento (modo OCR)
-- 🔧 **Opções Avançadas**: Configurações personalizadas para cada método
 - 🎯 **Detecção de Múltiplos Eventos**: Identificação de vários eventos em um único cartaz (modo Gemini)
 - 🎨 **Interface de Cards**: Visualização clara dos eventos com cards interativos (modo Gemini)
 - ✏️ **Edição de Eventos**: Edição fácil dos dados extraídos antes do envio
+- 📋 **Suporte a Colar Imagens**: Possibilidade de colar imagens diretamente com Ctrl+V
+- 🌐 **Implementação Serverless**: API implementada com Vercel Functions
 
 ## 🛠️ Tecnologias Utilizadas <a name="tecnologias"></a>
 
@@ -54,20 +53,17 @@ O **Mini Agente de Eventos** é uma aplicação web projetada para extrair infor
   - Canvas API - Utilizado para pré-processamento e aprimoramento de imagens
   - Algoritmos de aumento de contraste para melhorar o reconhecimento de texto
 
-- **Extração de Dados**:
-  - Expressões regulares (Regex) para análise e estruturação de texto (modo OCR)
-  - Processamento de linguagem natural via Gemini (modo IA)
-  - Algoritmos de correspondência de padrões para identificação de:
-    - Datas e horários em formato brasileiro
-    - Preços em Reais (R$)
-    - Nomes de artistas e bandas
-    - Endereços e locais de eventos
+- **Backend / API**:
+  - Vercel Functions (Serverless)
+  - Node.js
+  - MongoDB (para armazenamento de eventos)
 
 ## 🏁 Como Usar <a name="como-usar"></a>
 
 1. Abra a página inicial (`escolha.html`) para selecionar o método de processamento
 2. Escolha entre OCR tradicional ou Gemini AI
 3. Clique em "Escolher imagem de evento" para selecionar um cartaz ou flyer
+   - Alternativamente, você pode colar uma imagem diretamente usando Ctrl+V
 4. A imagem será exibida automaticamente após a seleção
 5. Clique em "Extrair Evento" para iniciar o processamento
 6. Após o processamento, você verá:
@@ -77,7 +73,7 @@ O **Mini Agente de Eventos** é uma aplicação web projetada para extrair infor
 7. No modo Gemini, você pode:
    - Editar qualquer evento detectado
    - Selecionar quais eventos deseja enviar
-8. Clique em "Enviar para API" para enviar os dados do(s) evento(s) selecionado(s) para o servidor web2py
+8. Clique em "Enviar para API" para enviar os dados do(s) evento(s) selecionado(s) para o servidor
 
 ## 🔄 Versões Disponíveis <a name="versões"></a>
 
@@ -96,44 +92,26 @@ O **Mini Agente de Eventos** é uma aplicação web projetada para extrair infor
 - Melhor para cartazes com layouts complexos ou texto de difícil leitura
 - Requer uma chave de API do Google AI Studio
 
-## ⚙️ Configuração Avançada <a name="configuração-avançada"></a>
-
-Para melhorar os resultados de extração, você pode acessar as opções avançadas:
-
-### Opções para OCR (Tesseract)
-1. Selecionar o idioma do OCR:
-   - Português
-   - Inglês
-   - Português + Inglês (para cartazes multilíngues)
-2. Ativar/desativar o aprimoramento de imagem (aumento de contraste)
-
-### Opções para Gemini
-1. Ajustar a temperatura do modelo (0.0 a 1.0):
-   - Valores mais baixos: respostas mais previsíveis e conservadoras
-   - Valores mais altos: respostas mais criativas e variadas
-2. Ativar/desativar análise detalhada (com explicações adicionais)
-
-Em ambos os modos, clique em "Reprocessar com estas opções" para aplicar as configurações.
-
 ## 🔌 API de Integração <a name="api"></a>
 
-O sistema integra-se com uma API Web2py para armazenar os eventos extraídos. A API está hospedada em `mtcporto2.pythonanywhere.com` e oferece os seguintes endpoints:
+O sistema integra-se com duas APIs distintas:
 
-- `POST /eventos/default/eventos`: Adiciona um novo evento ao banco de dados
-- `GET /eventos/default/eventos`: Lista eventos cadastrados
+### 1. API Web2py
+- Hospedada em `mtcporto2.pythonanywhere.com`
+- Endpoints:
+  - `POST /eventos/default/eventos`: Adiciona um novo evento ao banco de dados
+  - `GET /eventos/default/eventos`: Lista eventos cadastrados
 
-### Implementação da API
-
-Para implementar a API no servidor Web2py, foram criados os seguintes arquivos de referência:
-
-- `api_default.py`: Código do controlador para ser adicionado ao `default.py` no servidor Web2py
-- `API_implementacao.md`: Guia detalhado para implementação da API no servidor
-- `API_seguranca.md`: Recomendações de segurança para a API em produção
-- `test_api.py`: Script Python para testar a API após implementação
+### 2. API Serverless (Vercel Functions)
+- Implementada no arquivo `/api/eventos.js`
+- Oferece as mesmas funcionalidades que a API Web2py
+- Endpoints:
+  - `POST /api/eventos`: Adiciona um novo evento
+  - `GET /api/eventos`: Lista eventos cadastrados
 
 ### Estrutura de Dados
 
-A API recebe os seguintes campos:
+As APIs recebem os seguintes campos:
 
 | Campo      | Tipo   | Obrigatório | Descrição                       |
 |------------|--------|-------------|----------------------------------|
@@ -163,12 +141,11 @@ A API recebe os seguintes campos:
 
 ## 🚀 Próximos Passos <a name="próximos-passos"></a>
 
-- Integração com API de eventos para cadastro automático
-- Suporte para reconhecimento de QR codes em cartazes
-- Implementação de modelo híbrido (OCR + IA) para melhor precisão
-- Interface unificada para escolher o método ideal para cada imagem
 - Sistema de feedback para melhorar algoritmos de detecção
 - Adicionar suporte para processamento em lote de múltiplas imagens
+- Implementação de autenticação e autorização na API
+- Dashboard para visualização e gerenciamento de eventos
+- Exportação de eventos para formatos populares (iCal, CSV)
 
 ## 👨‍💻 Autor <a name="autor"></a>
 
@@ -176,6 +153,5 @@ Desenvolvido como parte de um projeto de automação para extração de informa�
 
 ---
 
-*Última atualização: 09 de maio de 2025*  
-*Versão Original: OCR com Tesseract*  
-*Nova Versão: OCR + Gemini AI*
+*Última atualização: 10 de maio de 2025*  
+*Versão Atual: 2.0.0 (OCR + Gemini AI)*
