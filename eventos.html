@@ -535,13 +535,13 @@
       let eventos = [];
       let currentFilter = 'todos';
       
-      // Obter eventos do servidor
+      // Obter eventos do servidor com o endpoint correto
       window.fetchEventos = function() {
         // Mostrar o estado de carregamento
         document.getElementById('loading').style.display = 'block';
         
-        // Corrigido o endpoint para /api/eventos para evitar erro 404
-        fetch('/api/eventos')
+        // Corrigido o endpoint para o correto na API externa
+        fetch('https://mtcporto.pythonanywhere.com/eventos/default/eventos')
           .then(response => {
             if (!response.ok) {
               throw new Error('Servidor retornou erro ' + response.status);
@@ -549,99 +549,124 @@
             return response.json();
           })
           .then(data => {
-            eventos = data;
-            displayEventos(eventos);
+            // A API retorna um objeto com propriedade "eventos"
+            eventos = data.eventos || [];
+            if (eventos.length === 0) {
+              document.getElementById('no-events').style.display = 'block';
+            } else {
+              document.getElementById('no-events').style.display = 'none';
+              displayEventos(eventos);
+            }
             document.getElementById('loading').style.display = 'none';
           })
           .catch(error => {
             console.error('Erro ao obter eventos:', error);
             document.getElementById('loading').style.display = 'none';
+            document.getElementById('no-events').style.display = 'block';
             
-            // Dados de exemplo para mostrar enquanto o servidor não está disponível
-            const exemploEventos = [
-              {
-                id: 1,
-                oque: "Show de Rock",
-                quando: "2025-05-15T20:00:00",
-                onde: "João Pessoa",
-                local: "Teatro Pedra do Reino",
-                fonte: "Site oficial",
-                preco: "R$ 50,00",
-                tipo: "show"
-              },
-              {
-                id: 2,
-                oque: "Peça Teatral",
-                quando: "2025-05-20T19:30:00",
-                onde: "João Pessoa",
-                local: "Teatro Santa Rosa",
-                fonte: "Instagram",
-                preco: "R$ 30,00",
-                tipo: "teatro"
-              },
-              {
-                id: 3,
-                oque: "Workshop de Programação",
-                quando: "2025-05-25T09:00:00",
-                onde: "João Pessoa",
-                local: "Centro de Convenções",
-                fonte: "Meetup",
-                preco: "Gratuito",
-                tipo: "workshop"
-              }
-            ];
+            // Não mostrar dados de exemplo, apenas exibir mensagem de erro
+            const container = document.querySelector('.container');
+            const tabs = document.querySelector('.tabs');
             
-            eventos = exemploEventos;
-            displayEventos(eventos);
-            
-            // Alerta mais amigável
-            const alertDiv = document.createElement('div');
-            alertDiv.className = 'alert alert-warning alert-dismissible fade show';
-            alertDiv.innerHTML = `
-              <strong>Servidor indisponível!</strong> Mostrando dados de exemplo.
-              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            `;
-            document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.tabs'));
+            // Verificar se já existe um alerta antes de criar outro
+            const existingAlert = document.querySelector('.alert-warning');
+            if (!existingAlert && container && tabs) {
+              const alertDiv = document.createElement('div');
+              alertDiv.className = 'alert alert-warning alert-dismissible fade show';
+              alertDiv.innerHTML = `
+                <strong>Erro ao conectar com o servidor!</strong> Não foi possível obter os eventos.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+              `;
+              container.insertBefore(alertDiv, tabs);
+            }
           });
       }
       
-      // Exibir eventos na interface
+      // Função para exibir os eventos no DOM
       function displayEventos(eventos) {
         const container = document.getElementById('eventos-container');
         container.innerHTML = '';
         
+        // Se não há eventos, mostrar mensagem
         if (eventos.length === 0) {
-          container.innerHTML = '<div class="col-12"><p class="text-center">Nenhum evento encontrado.</p></div>';
+          document.getElementById('no-events').style.display = 'block';
           return;
         }
         
-        eventos.forEach(evento => {
-          const date = new Date(evento.quando);
-          const formattedDate = `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
-          const imgUrl = evento.imagem || '';
-          
+        // Esconder mensagem de "nenhum evento encontrado"
+        document.getElementById('no-events').style.display = 'none';
+        
+        // Filtrar eventos conforme necessário
+        const filteredEventos = currentFilter === 'todos' 
+          ? eventos 
+          : eventos.filter(evento => evento.tipo && evento.tipo.toLowerCase() === currentFilter);
+        
+        if (filteredEventos.length === 0) {
+          document.getElementById('no-events').style.display = 'block';
+          return;
+        }
+        
+        // Ordenar eventos por data
+        filteredEventos.sort((a, b) => {
+          const dataA = parseDateString(a.quando);
+          const dataB = parseDateString(b.quando);
+          return dataA - dataB;
+        });
+        
+        // Criar cards para cada evento
+        filteredEventos.forEach(evento => {
           const card = document.createElement('div');
           card.className = 'col-md-4 mb-4';
+          
+          // Formatar data para exibição
+          const eventDate = parseDateString(evento.quando);
+          const formattedDate = new Intl.DateTimeFormat('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          }).format(eventDate);
+          
+          // Determinar se é um evento passado
+          const isPast = eventDate < new Date();
+          
+          // Definir classe com base no status do evento
+          let statusClass = isPast ? 'past-event' : 'upcoming-event';
+          
+          // Definir uma imagem padrão se nenhuma for fornecida
+          const imageUrl = evento.imagem 
+            ? evento.imagem 
+            : 'https://via.placeholder.com/300x200?text=Sem+Imagem';
+          
+          // Criar o conteúdo do card
           card.innerHTML = `
-            <div class="card h-100">
-              ${imgUrl ? `<img src="${imgUrl}" class="card-img-top" alt="${evento.oque}">` : '<div class="no-image-placeholder d-flex justify-content-center align-items-center bg-light" style="height: 200px;"><i class="fas fa-image text-muted" style="font-size: 3rem;"></i></div>'}
+            <div class="card h-100 ${statusClass}">
+              <div class="card-img-top-container">
+                <img src="${imageUrl}" class="card-img-top" alt="${evento.oque}">
+                ${isPast ? '<div class="past-badge">Evento Passado</div>' : ''}
+              </div>
               <div class="card-body">
                 <h5 class="card-title">${evento.oque}</h5>
                 <p class="card-text">
-                  <i class="fas fa-calendar-alt"></i> ${formattedDate}<br>
-                  <i class="fas fa-map-marker-alt"></i> ${evento.onde} - ${evento.local}<br>
-                  ${evento.preco ? `<i class="fas fa-tag"></i> ${evento.preco}<br>` : ''}
-                  ${evento.tipo ? `<span class="badge bg-secondary">${evento.tipo}</span>` : ''}
+                  <i class="far fa-calendar-alt"></i> ${formattedDate}<br>
+                  <i class="fas fa-map-marker-alt"></i> ${evento.local}, ${evento.onde}
+                  ${evento.endereco ? `<br><small>${evento.endereco}</small>` : ''}
                 </p>
-                <p class="card-text"><small class="text-muted">Fonte: ${evento.fonte}</small></p>
+                <div class="d-flex justify-content-between align-items-center">
+                  ${evento.preco 
+                    ? `<span class="badge bg-success">R$ ${evento.preco}</span>` 
+                    : '<span class="badge bg-info">Gratuito ou não informado</span>'}
+                  <span class="badge bg-secondary">${evento.tipo || 'Não categorizado'}</span>
+                </div>
               </div>
-              <div class="card-footer d-flex justify-content-end">
-                <button class="btn btn-sm btn-outline-primary me-2 edit-event" data-id="${evento.id}">
-                  <i class="fas fa-edit"></i> Editar
-                </button>
-                <button class="btn btn-sm btn-outline-danger delete-event" data-id="${evento.id}">
-                  <i class="fas fa-trash"></i> Excluir
-                </button>
+              <div class="card-footer">
+                <small class="text-muted">Fonte: ${evento.fonte}</small>
+                ${evento.id 
+                  ? `<button class="btn btn-sm btn-outline-primary float-end edit-btn" data-id="${evento.id}">
+                      <i class="fas fa-edit"></i>
+                     </button>` 
+                  : ''}
               </div>
             </div>
           `;
@@ -649,46 +674,55 @@
           container.appendChild(card);
         });
         
-        // Adicionar event listeners para os botões de editar e excluir
-        document.querySelectorAll('.edit-event').forEach(btn => {
+        // Adicionar event listeners aos botões de edição
+        document.querySelectorAll('.edit-btn').forEach(btn => {
           btn.addEventListener('click', function() {
             const id = this.getAttribute('data-id');
-            editEvent(id);
-          });
-        });
-        
-        document.querySelectorAll('.delete-event').forEach(btn => {
-          btn.addEventListener('click', function() {
-            const id = this.getAttribute('data-id');
-            deleteEvent(id);
+            editEvento(id);
           });
         });
       }
       
-      // Filtrar eventos por tipo
-      function filterEventos(tipo) {
-        currentFilter = tipo;
-        const filtered = tipo === 'todos' ? eventos : eventos.filter(evento => evento.tipo === tipo);
-        displayEventos(filtered);
+      // Função auxiliar para converter string de data para objeto Date
+      function parseDateString(dateStr) {
+        if (!dateStr) return new Date(); // Data atual se nenhuma for fornecida
         
-        // Atualizar UI dos botões de filtro
-        document.querySelectorAll('.filter-btn').forEach(btn => {
-          if (btn.getAttribute('data-filter') === tipo) {
-            btn.classList.add('active');
-          } else {
-            btn.classList.remove('active');
-          }
-        });
+        // Formato esperado: "DD/MM/YYYY HH:MM"
+        const parts = dateStr.split(' ');
+        if (parts.length !== 2) return new Date(); // Formato inválido
+        
+        const dateParts = parts[0].split('/');
+        const timeParts = parts[1].split(':');
+        
+        if (dateParts.length !== 3 || timeParts.length !== 2) return new Date(); // Formato inválido
+        
+        const day = parseInt(dateParts[0], 10);
+        const month = parseInt(dateParts[1], 10) - 1; // Meses em JS são 0-indexed
+        const year = parseInt(dateParts[2], 10);
+        const hour = parseInt(timeParts[0], 10);
+        const minute = parseInt(timeParts[1], 10);
+        
+        return new Date(year, month, day, hour, minute);
       }
       
-      // Configurar listeners para os botões de filtro
+      // Configurar filtros
       document.querySelectorAll('.filter-btn').forEach(btn => {
         btn.addEventListener('click', function() {
-          const filter = this.getAttribute('data-filter');
-          filterEventos(filter);
+          // Remover classe active de todos os botões
+          document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+          
+          // Adicionar classe active ao botão clicado
+          this.classList.add('active');
+          
+          // Atualizar filtro corrente
+          currentFilter = this.getAttribute('data-filter');
+          
+          // Reexibir eventos com o novo filtro
+          displayEventos(eventos);
         });
       });
       
+      // Restante do código...
       // Modal e formulário de eventos
       const eventModal = new bootstrap.Modal(document.getElementById('eventModal'));
       const eventForm = document.getElementById('eventForm');
