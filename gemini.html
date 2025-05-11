@@ -1013,8 +1013,7 @@
           // Enviar requisição fetch com FormData (inclui o arquivo)
           const response = await fetch(apiUrl, {
             method: 'POST',
-            body: formData,
-            mode: 'cors'
+            body: formData
           });
           
           if (response.ok) {

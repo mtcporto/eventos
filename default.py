@@ -2,15 +2,10 @@
 # Controlador default.py para o servidor Web2py em mtcporto.pythonanywhere.com
 # Versão compatível com Python 3
 
-# Função para configurar CORS headers em cada resposta
-def set_cors_headers():
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Requested-With, Authorization, Origin, Accept'
-    response.headers['Access-Control-Allow-Credentials'] = 'true'
-
-# Configuração inicial de CORS
-set_cors_headers()
+# Configuração de CORS simples - igual ao Auralis
+response.headers['Access-Control-Allow-Origin'] = '*'
+response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Requested-With, Authorization'
 
 # Função auxiliar para obter dados da requisição - igual ao Auralis
 def get_request_data():
@@ -26,7 +21,6 @@ def get_request_data():
 
 # Endpoint OPTIONS básico
 def options():
-    set_cors_headers()
     return {}
 
 # Função para converter formato de data DD/MM/YYYY para YYYY-MM-DD
@@ -93,9 +87,6 @@ def eventos():
     GET: lista eventos
     POST: adiciona evento
     """
-    # Configurar CORS para todas as respostas
-    set_cors_headers()
-    
     # Para requisições OPTIONS (preflight CORS)
     if request.env.request_method == 'OPTIONS':
         return {}
@@ -108,11 +99,9 @@ def eventos():
         campos_obrigatorios = ['oque', 'quando', 'onde', 'fonte', 'local']
         for campo in campos_obrigatorios:
             if campo not in data or not data[campo]:
-                response = response.json({
+                return response.json({
                     'error': 'Campo obrigatório ausente ou vazio: {0}'.format(campo)
                 })
-                set_cors_headers()
-                return response
         
         try:
             # Converter formato da data se necessário
@@ -138,12 +127,10 @@ def eventos():
             # Commit explícito
             db.commit()
             
-            response = response.json({
+            return response.json({
                 'status': 'ok',
                 'id': evento_id
             })
-            set_cors_headers()
-            return response
         
         except Exception as e:
             # Rollback em caso de erro
@@ -154,13 +141,11 @@ def eventos():
             tb = traceback.format_exc()
             print(tb)
             
-            response = response.json({
+            return response.json({
                 'status': 'error',
                 'message': str(e),
                 'traceback': tb
             }, status=500)
-            set_cors_headers()
-            return response
     
     # Para requisições GET - listar eventos
     elif request.env.request_method == 'GET':
@@ -189,11 +174,9 @@ def eventos():
                 })
             
             # Retorna JSON com resultados no formato esperado pelo frontend
-            response = response.json({
+            return response.json({
                 'eventos': resultado
             })
-            set_cors_headers()
-            return response
         
         except Exception as e:
             import traceback
@@ -202,24 +185,19 @@ def eventos():
             tb = traceback.format_exc()
             print(tb)
             
-            response = response.json({
+            return response.json({
                 'status': 'error',
                 'message': str(e),
                 'traceback': tb
             }, status=500)
-            set_cors_headers()
-            return response
     
     # Método não suportado
     else:
-        response = response.json({
+        return response.json({
             'error': 'Método não suportado'
         }, status=405)
-        set_cors_headers()
-        return response
 
 # Para testar o funcionamento
 def api_teste():
     """Página para testar a API de eventos"""
-    set_cors_headers()
     return dict(message="API de eventos está funcionando corretamente")
