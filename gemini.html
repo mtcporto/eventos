@@ -975,64 +975,56 @@
           const descricao = getValueByLabel('Descrição');
           if (descricao) evento.descricao = descricao;
           
-          // Sempre incluir a imagem do evento se disponível
+          // Adicionar a imagem como URL
           if (lastImageData) {
-            evento.imagem = lastImageData;
+            // Converter base64 para Blob
+            const base64Data = lastImageData.split(',')[1];
+            const mimeType = lastImageData.match(/data:([^;]+);/)[1];
+            const byteCharacters = atob(base64Data);
+            const byteArrays = [];
+            
+            for (let i = 0; i < byteCharacters.length; i += 512) {
+              const slice = byteCharacters.slice(i, i + 512);
+              const byteNumbers = new Array(slice.length);
+              
+              for (let j = 0; j < slice.length; j++) {
+                byteNumbers[j] = slice.charCodeAt(j);
+              }
+              
+              byteArrays.push(new Uint8Array(byteNumbers));
+            }
+            
+            const blob = new Blob(byteArrays, {type: mimeType});
+            evento.imagem_file = blob;
           }
           
           // Registrar o que será enviado
           console.log("Enviando evento:", evento);
           
-          // Tentativa 1: Enviar como dados de formulário
-          try {
-            // Criar objeto FormData
-            const formData = new FormData();
-            Object.entries(evento).forEach(([key, value]) => {
+          // Criar objeto FormData para upload de arquivo
+          const formData = new FormData();
+          Object.entries(evento).forEach(([key, value]) => {
+            if (key === 'imagem_file') {
+              formData.append('imagem', value, 'imagem.jpg'); // Nome do arquivo para o backend
+            } else {
               formData.append(key, value);
-            });
-            
-            // Enviar requisição fetch
-            const response = await fetch(apiUrl, {
-              method: 'POST',
-              body: formData,
-              mode: 'cors'
-            });
-            
-            if (response.ok) {
-              const result = await response.json();
-              console.log("Resposta da API:", result);
-              sucessos++;
-              continue; // Prosseguir para o próximo evento
             }
-          } catch (err) {
-            console.log("Falha ao enviar como FormData, tentando JSON:", err);
+          });
+          
+          // Enviar requisição fetch com FormData (inclui o arquivo)
+          const response = await fetch(apiUrl, {
+            method: 'POST',
+            body: formData,
+            mode: 'cors'
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            console.log("Resposta da API:", result);
+            sucessos++;
+          } else {
+            throw new Error(`Erro na API: ${response.status}`);
           }
-          
-          // Tentativa 2: Enviar como JSON
-          try {
-            const response = await fetch(apiUrl, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify(evento),
-              mode: 'cors'
-            });
-            
-            if (response.ok) {
-              const result = await response.json();
-              console.log("Resposta da API (JSON):", result);
-              sucessos++;
-              continue; // Prosseguir para o próximo evento
-            }
-          } catch (err) {
-            console.log("Falha ao enviar como JSON:", err);
-          }
-          
-          // Se chegou aqui, ambas as tentativas falharam
-          falhas++;
-          mensagens.push(`Não foi possível enviar "${atracao}"`);
-          
         } catch (error) {
           console.error("Erro ao processar evento:", error);
           falhas++;
