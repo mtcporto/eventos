@@ -1,11 +1,16 @@
 # -*- coding: utf-8 -*-
 # Controlador default.py para o servidor Web2py em mtcporto.pythonanywhere.com
-# Versão compatível com Python 2.7
+# Versão compatível com Python 3
 
-# Configuração de CORS simples - igual ao Auralis
-response.headers['Access-Control-Allow-Origin'] = '*'
-response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Requested-With, Authorization'
+# Configuração de CORS - melhorada para lidar com preflight requests
+def _set_cors_headers():
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Requested-With, Authorization, Accept, Origin'
+    response.headers['Access-Control-Max-Age'] = '86400'  # Cache preflight for 24 hours
+
+# Aplica CORS headers em cada requisição
+_set_cors_headers()
 
 # Definição da tabela t_eventos com campo f_imagem alterado para tipo 'upload'
 db.define_table('t_eventos',
@@ -33,8 +38,9 @@ def get_request_data():
         data = request.vars or {}
     return data
 
-# Endpoint OPTIONS básico
+# Endpoint OPTIONS básico - importante para preflight CORS
 def options():
+    _set_cors_headers()  # Assegura que os headers estejam presentes
     return {}
 
 # Função atualizada para lidar com upload de imagens como arquivos
@@ -111,68 +117,26 @@ def eventos():
     GET: lista eventos
     POST: adiciona evento
     """
+    # Sempre aplicar headers CORS para qualquer tipo de request
+    _set_cors_headers()
+    
+    # Para requisições OPTIONS (preflight CORS)
+    if request.env.request_method == 'OPTIONS':
+        return {}
+    
     # Para requisições POST
-    if request.env.request_method == 'POST':
-        data = get_request_data()
-        
-        # Validar campos obrigatórios
-        campos_obrigatorios = ['oque', 'quando', 'onde', 'fonte', 'local']
-        for campo in campos_obrigatorios:
-            if campo not in data or not data[campo]:
-                return response.json({
-                    'error': 'Campo obrigatório ausente ou vazio: {0}'.format(campo)
-                })
-        
+    elif request.env.request_method == 'POST':
         try:
-            # Processar imagem se for enviada como arquivo
-            imagem_url = None
-            if request.files and request.files.get('imagem'):
-                try:
-                    # Fazer upload da imagem usando a função salvar_imagem
-                    resultado = salvar_imagem()
-                    
-                    if resultado and isinstance(resultado, dict) and 'url' in resultado:
-                        imagem_url = resultado['url']
-                except Exception as e:
-                    # Em caso de erro no upload, não salvar a imagem
-                    print("Erro ao processar imagem:", str(e))
-            # Compatibilidade com formato base64 (código antigo)
-            elif 'imagem' in data and data['imagem'] and isinstance(data['imagem'], str) and data['imagem'].startswith('data:'):
-                try:
-                    # Fazer upload da imagem usando a função antiga
-                    temp_data = {'imagem': data['imagem']}
-                    old_request_method = request.env.request_method
-                    request.env.request_method = 'POST'
-                    
-                    # Usar a versão antiga da função só para compatibilidade
-                    import base64
-                    import uuid
-                    import os
-                    
-                    img_data = data['imagem']
-                    if ',' in img_data:
-                        img_format = img_data.split(';')[0].split('/')[1]
-                        img_data = img_data.split(',')[1]
-                    else:
-                        img_format = 'jpeg'
-                    
-                    img_name = f"{uuid.uuid4()}.{img_format}"
-                    img_dir = os.path.join(request.folder, 'static', 'uploads')
-                    
-                    if not os.path.exists(img_dir):
-                        os.makedirs(img_dir)
-                    
-                    img_path = os.path.join(img_dir, img_name)
-                    
-                    with open(img_path, 'wb') as f:
-                        f.write(base64.b64decode(img_data))
-                    
-                    imagem_url = URL('static', 'uploads', img_name, host=True)
-                    request.env.request_method = old_request_method
-                except Exception as e:
-                    print("Erro ao processar imagem base64:", str(e))
-            elif 'imagem' in data:
-                imagem_url = data['imagem']
+            # Obter dados do formulário ou JSON
+            data = get_request_data()
+            
+            # Validar campos obrigatórios
+            campos_obrigatorios = ['oque', 'quando', 'onde', 'fonte', 'local']
+            for campo in campos_obrigatorios:
+                if campo not in data or not data[campo]:
+                    return response.json({
+                        'error': 'Campo obrigatório ausente ou vazio: {0}'.format(campo)
+                    })
             
             # Inserir no banco
             evento_id = db.t_eventos.insert(
@@ -181,7 +145,7 @@ def eventos():
                 f_onde=data['onde'],
                 f_fonte=data['fonte'],
                 f_local=data['local'],
-                f_imagem=imagem_url,
+                f_imagem=request.vars.get('imagem', None),  # Verifica o upload de arquivo
                 f_endereco=data.get('endereco', None),
                 f_preco=data.get('preco', None),
                 f_descricao=data.get('descricao', None),
@@ -191,26 +155,28 @@ def eventos():
             # Commit explícito
             db.commit()
             
+            # Log de sucesso
+            print("Evento cadastrado com sucesso, ID:", evento_id)
+            
             return response.json({
                 'status': 'ok',
-                'id': evento_id,
-                'imagem_url': imagem_url
+                'id': evento_id
             })
         
         except Exception as e:
             # Rollback em caso de erro
             db.rollback()
-            import sys
             import traceback
             
             # Log detalhado do erro
-            tb = traceback.format_exc()
-            print(tb)
+            error_trace = traceback.format_exc()
+            print("ERRO AO CADASTRAR EVENTO:", str(e))
+            print(error_trace)
             
             return response.json({
                 'status': 'error',
                 'message': str(e),
-                'traceback': tb
+                'traceback': error_trace
             }, status=500)
     
     # Para requisições GET - listar eventos
@@ -245,17 +211,17 @@ def eventos():
             })
         
         except Exception as e:
-            import sys
             import traceback
             
             # Log detalhado do erro
-            tb = traceback.format_exc()
-            print(tb)
+            error_trace = traceback.format_exc()
+            print("ERRO AO LISTAR EVENTOS:", str(e))
+            print(error_trace)
             
             return response.json({
                 'status': 'error',
                 'message': str(e),
-                'traceback': tb
+                'traceback': error_trace
             }, status=500)
     
     # Método não suportado
