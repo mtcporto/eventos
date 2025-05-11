@@ -715,6 +715,18 @@
         header.appendChild(date);
         card.appendChild(header);
         
+        // Exibir imagem do evento, se houver nome de arquivo
+        if (evento.imagem) {
+          const img = document.createElement('img');
+          img.src = `https://mtcporto.pythonanywhere.com/eventos/default/imagem/${evento.imagem}`;
+          img.alt = 'Imagem do evento';
+          img.style.maxWidth = '100%';
+          img.style.maxHeight = '200px';
+          img.style.display = 'block';
+          img.style.margin = '10px auto';
+          card.appendChild(img);
+        }
+        
         // Conteúdo do card
         const content = document.createElement('div');
         content.className = 'event-card-content';
@@ -915,78 +927,53 @@
     }
       // Enviar eventos selecionados para a API
     async function enviarEventos() {
-      // Obter todos os cards de eventos selecionados
       const eventCards = document.querySelectorAll('.event-card');
       const selecionados = Array.from(eventCards).filter(card => 
         card.querySelector('input[type="checkbox"]').checked
       );
-      
       if (selecionados.length === 0) {
         alert("Nenhum evento selecionado para envio.");
         return;
       }
-      
-      // Desabilitar botão durante o envio
       const sendButton = document.getElementById('sendButton');
       sendButton.disabled = true;
       sendButton.textContent = 'Enviando...';
-      
-      // URL da API
       const apiUrl = 'https://mtcporto.pythonanywhere.com/eventos/default/eventos';
-      
-      // Contadores para feedback
       let sucessos = 0;
       let falhas = 0;
       let mensagens = [];
-      
-      // Processar cada evento selecionado
+      // Pega o arquivo da imagem selecionada
+      const input = document.getElementById("imageInput");
+      const file = input.files[0];
       for (const card of selecionados) {
         try {
-          // Extrair dados do card
           const atracao = card.querySelector('.event-card-title').textContent;
           const data = card.querySelector('.event-card-date').textContent;
-          
-          // Buscar valores de elementos com determinados rótulos
           const getValueByLabel = (label) => {
             const labelElement = Array.from(card.querySelectorAll('.event-card-item-label'))
               .find(el => el.textContent === label);
             return labelElement?.nextElementSibling?.textContent || '';
           };
-          
-          // Construir objeto com dados do evento
-          const evento = {
-            oque: atracao,
-            quando: data + ' ' + getValueByLabel('Horário'),
-            onde: getValueByLabel('Cidade') || 'João Pessoa',
-            fonte: getValueByLabel('Fonte') || 'Mini Agente de Eventos',
-            local: getValueByLabel('Local') || 'Local não especificado'
-          };
-          
-          // Adicionar campos opcionais se existirem
+          const formData = new FormData();
+          formData.append('oque', atracao);
+          formData.append('quando', data + ' ' + getValueByLabel('Horário'));
+          formData.append('onde', getValueByLabel('Cidade') || 'João Pessoa');
+          formData.append('fonte', getValueByLabel('Fonte') || 'Mini Agente de Eventos');
+          formData.append('local', getValueByLabel('Local') || 'Local não especificado');
           const endereco = getValueByLabel('Endereço');
-          if (endereco) evento.endereco = endereco;
-          
+          if (endereco) formData.append('endereco', endereco);
           const preco = getValueByLabel('Preço');
-          if (preco) evento.preco = preco;
-          
+          if (preco) formData.append('preco', preco);
           const tipo = getValueByLabel('Tipo');
-          if (tipo) evento.tipo = tipo;
-          
+          if (tipo) formData.append('tipo', tipo);
           const descricao = getValueByLabel('Descrição');
-          if (descricao) evento.descricao = descricao;
-          
-          console.log("Enviando evento:", evento);
-          
-          // Não enviar a imagem diretamente - converta apenas o JSON
-          // Isso ajuda a evitar problemas de CORS com imagens grandes
+          if (descricao) formData.append('descricao', descricao);
+          // Adiciona a imagem real (arquivo) se houver
+          if (file) formData.append('imagem', file);
           const response = await fetch(apiUrl, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(evento)
+            body: formData
           });
-          
           if (response.ok) {
             const result = await response.json();
             console.log("Resposta da API:", result);
@@ -1001,16 +988,11 @@
           mensagens.push(`Erro ao processar "${card.querySelector('.event-card-title').textContent}": ${error.message}`);
         }
       }
-      
-      // Restaurar estado do botão
       sendButton.disabled = false;
       sendButton.textContent = 'Enviar para API';
-      
-      // Mostrar feedback final
       if (sucessos > 0) {
         alert(`${sucessos} evento(s) enviado(s) com sucesso!`);
       }
-      
       if (falhas > 0) {
         alert(`${falhas} evento(s) não pôde(puderam) ser enviado(s):\n${mensagens.join('\n')}`);
       }

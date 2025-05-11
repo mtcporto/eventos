@@ -84,6 +84,20 @@ def processar_imagem_base64(imagem_base64):
     
     return imagem_base64  # Retornar original se não for base64 ou ocorrer erro
 
+def imagem():
+    """Endpoint para servir imagem de evento com CORS liberado"""
+    _set_cors_headers()
+    import os
+    from gluon.contenttype import contenttype
+    nome_arquivo = request.args(0)
+    if not nome_arquivo:
+        return response.json({'error': 'Arquivo não especificado'}, status=400)
+    caminho = os.path.join(request.folder, 'uploads', nome_arquivo)
+    if not os.path.isfile(caminho):
+        return response.json({'error': 'Arquivo não encontrado'}, status=404)
+    response.headers['Content-Type'] = contenttype(nome_arquivo)
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    return open(caminho, 'rb').read()
 
 # Endpoint para eventos - estruturado como os endpoints do Auralis
 def eventos():
@@ -173,7 +187,7 @@ def eventos():
                     'onde': e.f_onde,
                     'local': e.f_local,
                     'fonte': e.f_fonte,
-                    'imagem': e.f_imagem,  # Inclui a imagem na resposta
+                    'imagem': e.f_imagem,  # Agora só o nome do arquivo
                     'endereco': e.f_endereco,
                     'preco': e.f_preco,
                     'descricao': e.f_descricao,
