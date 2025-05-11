@@ -342,7 +342,7 @@
     const GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
     
     // Endpoint da API Web2py real
-    const API_ENDPOINT = "https://mtcporto2.pythonanywhere.com/eventos/default/eventos";
+    const API_ENDPOINT = "https://mtcporto.pythonanywhere.com/eventos/default/eventos";
 
     // --- Variáveis globais ---
     let rawText = "";
@@ -932,7 +932,7 @@
       sendButton.textContent = 'Enviando...';
       
       // URL da API
-      const apiUrl = 'https://mtcporto2.pythonanywhere.com/eventos/default/eventos';
+      const apiUrl = 'https://mtcporto.pythonanywhere.com/eventos/default/eventos';
       
       // Contadores para feedback
       let sucessos = 0;
@@ -975,7 +975,15 @@
           const descricao = getValueByLabel('Descrição');
           if (descricao) evento.descricao = descricao;
           
-          // Adicionar a imagem como URL
+          // Criar objeto FormData para upload de arquivo
+          const formData = new FormData();
+          
+          // Adicionar todos os dados do evento ao FormData
+          Object.entries(evento).forEach(([key, value]) => {
+            formData.append(key, value);
+          });
+          
+          // Adicionar a imagem como arquivo se disponível
           if (lastImageData) {
             // Converter base64 para Blob
             const base64Data = lastImageData.split(',')[1];
@@ -995,21 +1003,12 @@
             }
             
             const blob = new Blob(byteArrays, {type: mimeType});
-            evento.imagem_file = blob;
+            const file = new File([blob], "evento-imagem.jpg", {type: mimeType});
+            formData.append('imagem', file);
           }
           
           // Registrar o que será enviado
           console.log("Enviando evento:", evento);
-          
-          // Criar objeto FormData para upload de arquivo
-          const formData = new FormData();
-          Object.entries(evento).forEach(([key, value]) => {
-            if (key === 'imagem_file') {
-              formData.append('imagem', value, 'imagem.jpg'); // Nome do arquivo para o backend
-            } else {
-              formData.append(key, value);
-            }
-          });
           
           // Enviar requisição fetch com FormData (inclui o arquivo)
           const response = await fetch(apiUrl, {
