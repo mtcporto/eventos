@@ -502,87 +502,30 @@
     </div>
   </footer>
   
-  <!-- Modal para adicionar/editar evento -->
-  <div class="modal fade" id="eventModal" tabindex="-1" aria-labelledby="eventModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h5 class="modal-title" id="eventModalLabel">Novo Evento</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
-        </div>
-        <div class="modal-body">
-          <form id="eventForm">
-            <input type="hidden" id="eventId">
-            
-            <div class="mb-3">
-              <label for="eventTitle" class="form-label">O que?*</label>
-              <input type="text" class="form-control" id="eventTitle" required>
-            </div>
-            
-            <div class="mb-3">
-              <label for="eventDate" class="form-label">Quando?*</label>
-              <input type="text" class="form-control" id="eventDate" placeholder="DD/MM/YYYY HH:MM" required>
-            </div>
-            
-            <div class="mb-3">
-              <label for="eventPlace" class="form-label">Onde?*</label>
-              <input type="text" class="form-control" id="eventPlace" required>
-            </div>
-            
-            <div class="mb-3">
-              <label for="eventLocation" class="form-label">Local*</label>
-              <input type="text" class="form-control" id="eventLocation" required>
-            </div>
-            
-            <div class="mb-3">
-              <label for="eventSource" class="form-label">Fonte*</label>
-              <input type="text" class="form-control" id="eventSource" required>
-            </div>
-            
-            <div class="mb-3">
-              <label for="eventPrice" class="form-label">Preço</label>
-              <input type="text" class="form-control" id="eventPrice">
-            </div>
-            
-            <div class="mb-3">
-              <label for="eventType" class="form-label">Tipo</label>
-              <input type="text" class="form-control" id="eventType">
-            </div>
-            
-            <div class="mb-3">
-              <label for="eventImage" class="form-label">Imagem</label>
-              <div class="d-flex align-items-center">
-                <div class="image-preview me-3" style="width: 100px; height: 100px; overflow: hidden; background: #f0f0f0; border-radius: 4px; display: flex; align-items: center; justify-content: center;">
-                  <img id="imagePreview" src="" style="max-width: 100%; max-height: 100%; display: none;">
-                  <i id="noImageIcon" class="fas fa-image text-muted" style="font-size: 2rem;"></i>
-                </div>
-                <div>
-                  <input type="file" class="form-control" id="eventImage" accept="image/*" style="display: none;">
-                  <button type="button" id="uploadImageBtn" class="btn btn-outline-primary mb-2">
-                    <i class="fas fa-upload"></i> Selecionar imagem
-                  </button>
-                  <button type="button" id="removeImageBtn" class="btn btn-outline-danger" style="display: none;">
-                    <i class="fas fa-trash"></i> Remover
-                  </button>
-                </div>
-              </div>
-              <input type="hidden" id="imageUrl">
-            </div>
-            
-            <div class="alert alert-danger" id="formError" style="display: none;"></div>
-          </form>
-        </div>
-        <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-          <button type="button" class="btn btn-primary" id="saveEventBtn">Salvar</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- Bootstrap e outros scripts -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js" crossorigin="anonymous"></script>
+
+  <!-- Função setActiveTab definida globalmente para ser acessível aos manipuladores de eventos onclick -->
+  <script>
+    // Função para alternar entre abas - movida para escopo global
+    function setActiveTab(element, tabName) {
+      // Remove active class from all tabs
+      document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+      
+      // Add active class to clicked tab
+      element.classList.add('active');
+      
+      // Hide all containers
+      document.querySelectorAll('.event-container').forEach(container => {
+        container.style.display = 'none';
+      });
+      
+      // Show the selected container
+      document.getElementById(tabName + '-container').style.display = 'block';
+    }
+  </script>
+  
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       // Atualizar o ano atual no rodapé
@@ -593,14 +536,73 @@
       let currentFilter = 'todos';
       
       // Obter eventos do servidor
-      function fetchEventos() {
-        fetch('/eventos')
-          .then(response => response.json())
+      window.fetchEventos = function() {
+        // Mostrar o estado de carregamento
+        document.getElementById('loading').style.display = 'block';
+        
+        // Corrigido o endpoint para /api/eventos para evitar erro 404
+        fetch('/api/eventos')
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('Servidor retornou erro ' + response.status);
+            }
+            return response.json();
+          })
           .then(data => {
             eventos = data;
             displayEventos(eventos);
+            document.getElementById('loading').style.display = 'none';
           })
-          .catch(error => console.error('Erro ao obter eventos:', error));
+          .catch(error => {
+            console.error('Erro ao obter eventos:', error);
+            document.getElementById('loading').style.display = 'none';
+            
+            // Dados de exemplo para mostrar enquanto o servidor não está disponível
+            const exemploEventos = [
+              {
+                id: 1,
+                oque: "Show de Rock",
+                quando: "2025-05-15T20:00:00",
+                onde: "João Pessoa",
+                local: "Teatro Pedra do Reino",
+                fonte: "Site oficial",
+                preco: "R$ 50,00",
+                tipo: "show"
+              },
+              {
+                id: 2,
+                oque: "Peça Teatral",
+                quando: "2025-05-20T19:30:00",
+                onde: "João Pessoa",
+                local: "Teatro Santa Rosa",
+                fonte: "Instagram",
+                preco: "R$ 30,00",
+                tipo: "teatro"
+              },
+              {
+                id: 3,
+                oque: "Workshop de Programação",
+                quando: "2025-05-25T09:00:00",
+                onde: "João Pessoa",
+                local: "Centro de Convenções",
+                fonte: "Meetup",
+                preco: "Gratuito",
+                tipo: "workshop"
+              }
+            ];
+            
+            eventos = exemploEventos;
+            displayEventos(eventos);
+            
+            // Alerta mais amigável
+            const alertDiv = document.createElement('div');
+            alertDiv.className = 'alert alert-warning alert-dismissible fade show';
+            alertDiv.innerHTML = `
+              <strong>Servidor indisponível!</strong> Mostrando dados de exemplo.
+              <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.tabs'));
+          });
       }
       
       // Exibir eventos na interface
