@@ -2,10 +2,15 @@
 # Controlador default.py para o servidor Web2py em mtcporto.pythonanywhere.com
 # Versão compatível com Python 3
 
-# Configuração de CORS simples - igual ao Auralis
-response.headers['Access-Control-Allow-Origin'] = '*'
-response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Requested-With, Authorization'
+# Função para configurar CORS headers em cada resposta
+def set_cors_headers():
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Requested-With, Authorization, Origin, Accept'
+    response.headers['Access-Control-Allow-Credentials'] = 'true'
+
+# Configuração inicial de CORS
+set_cors_headers()
 
 # Função auxiliar para obter dados da requisição - igual ao Auralis
 def get_request_data():
@@ -21,21 +26,65 @@ def get_request_data():
 
 # Endpoint OPTIONS básico
 def options():
+    set_cors_headers()
     return {}
 
-# Definição da tabela t_eventos com campo f_imagem alterado para tipo 'upload'
-db.define_table('t_eventos',
-    Field('f_oque', 'string', label='O que'),
-    Field('f_quando', 'datetime', label='Quando'),
-    Field('f_onde', 'string', label='Onde'),
-    Field('f_local', 'string', label='Local'),
-    Field('f_imagem', 'upload', label='Imagem'),  # Alterado de 'text' para 'upload'
-    Field('f_fonte', 'string', label='Fonte'),
-    Field('f_endereco', 'string', label='Endereço'),
-    Field('f_preco', 'string', label='Preço'),
-    Field('f_descricao', 'text', label='Descrição'),
-    Field('f_tipo', 'string', label='Tipo')
-)
+# Função para converter formato de data DD/MM/YYYY para YYYY-MM-DD
+def converter_formato_data(data_str):
+    from datetime import datetime
+    try:
+        # Verificar se tem formato DD/MM/YYYY ou DD/MM/YYYY HH:MM
+        if '/' in data_str:
+            if ' ' in data_str:  # Se tem hora
+                data_parte, hora_parte = data_str.split(' ', 1)
+                dia, mes, ano = data_parte.split('/')
+                # Formatar como YYYY-MM-DD HH:MM
+                return f"{ano}-{mes}-{dia} {hora_parte}"
+            else:  # Se tem só data
+                dia, mes, ano = data_str.split('/')
+                # Formatar como YYYY-MM-DD
+                return f"{ano}-{mes}-{dia}"
+        return data_str  # Retorna sem modificar se não for no formato esperado
+    except Exception as e:
+        print(f"Erro ao converter data: {e}")
+        return data_str
+
+# Função para processar imagem base64 para o formato correto de upload
+def processar_imagem_base64(imagem_base64):
+    import base64
+    import os
+    import uuid
+    from io import BytesIO
+    
+    if not imagem_base64:
+        return None
+        
+    try:
+        # Verificar se é uma string base64
+        if isinstance(imagem_base64, str) and imagem_base64.startswith('data:'):
+            # Extrair tipo e dados
+            formato, dados_base64 = imagem_base64.split(',', 1)
+            
+            # Determinar extensão do arquivo
+            extensao = 'png'  # extensão padrão
+            if 'jpeg' in formato or 'jpg' in formato:
+                extensao = 'jpg'
+            elif 'png' in formato:
+                extensao = 'png'
+            
+            # Decodificar dados base64
+            dados_imagem = base64.b64decode(dados_base64)
+            
+            # Criar nome de arquivo único
+            nome_arquivo = f"evento_{uuid.uuid4().hex}.{extensao}"
+            
+            # Retornar tupla no formato esperado pelo campo upload
+            return (BytesIO(dados_imagem), nome_arquivo)
+    except Exception as e:
+        print(f"Erro ao processar imagem base64: {e}")
+    
+    return imagem_base64  # Retornar original se não for base64 ou ocorrer erro
+
 
 # Endpoint para eventos - estruturado como os endpoints do Auralis
 def eventos():
@@ -44,6 +93,9 @@ def eventos():
     GET: lista eventos
     POST: adiciona evento
     """
+    # Configurar CORS para todas as respostas
+    set_cors_headers()
+    
     # Para requisições OPTIONS (preflight CORS)
     if request.env.request_method == 'OPTIONS':
         return {}
@@ -56,19 +108,27 @@ def eventos():
         campos_obrigatorios = ['oque', 'quando', 'onde', 'fonte', 'local']
         for campo in campos_obrigatorios:
             if campo not in data or not data[campo]:
-                return response.json({
+                response = response.json({
                     'error': 'Campo obrigatório ausente ou vazio: {0}'.format(campo)
                 })
+                set_cors_headers()
+                return response
         
         try:
+            # Converter formato da data se necessário
+            quando_convertido = converter_formato_data(data['quando'])
+            
+            # Processar imagem se presente
+            imagem_processada = processar_imagem_base64(data.get('imagem', None))
+            
             # Inserir no banco
             evento_id = db.t_eventos.insert(
                 f_oque=data['oque'],
-                f_quando=data['quando'],
+                f_quando=quando_convertido,  # Usar data convertida
                 f_onde=data['onde'],
                 f_fonte=data['fonte'],
                 f_local=data['local'],
-                f_imagem=data.get('imagem', None),  # Armazena a imagem do cartaz do evento
+                f_imagem=imagem_processada,  # Usar imagem processada
                 f_endereco=data.get('endereco', None),
                 f_preco=data.get('preco', None),
                 f_descricao=data.get('descricao', None),
@@ -78,10 +138,12 @@ def eventos():
             # Commit explícito
             db.commit()
             
-            return response.json({
+            response = response.json({
                 'status': 'ok',
                 'id': evento_id
             })
+            set_cors_headers()
+            return response
         
         except Exception as e:
             # Rollback em caso de erro
@@ -92,11 +154,13 @@ def eventos():
             tb = traceback.format_exc()
             print(tb)
             
-            return response.json({
+            response = response.json({
                 'status': 'error',
                 'message': str(e),
                 'traceback': tb
             }, status=500)
+            set_cors_headers()
+            return response
     
     # Para requisições GET - listar eventos
     elif request.env.request_method == 'GET':
@@ -125,9 +189,11 @@ def eventos():
                 })
             
             # Retorna JSON com resultados no formato esperado pelo frontend
-            return response.json({
+            response = response.json({
                 'eventos': resultado
             })
+            set_cors_headers()
+            return response
         
         except Exception as e:
             import traceback
@@ -136,19 +202,24 @@ def eventos():
             tb = traceback.format_exc()
             print(tb)
             
-            return response.json({
+            response = response.json({
                 'status': 'error',
                 'message': str(e),
                 'traceback': tb
             }, status=500)
+            set_cors_headers()
+            return response
     
     # Método não suportado
     else:
-        return response.json({
+        response = response.json({
             'error': 'Método não suportado'
         }, status=405)
+        set_cors_headers()
+        return response
 
 # Para testar o funcionamento
 def api_teste():
     """Página para testar a API de eventos"""
+    set_cors_headers()
     return dict(message="API de eventos está funcionando corretamente")
