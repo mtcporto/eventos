@@ -2,10 +2,14 @@
 # Controlador default.py para o servidor Web2py em mtcporto.pythonanywhere.com
 # Versão compatível com Python 3
 
-# Configuração de CORS simples - igual ao Auralis
-response.headers['Access-Control-Allow-Origin'] = '*'
-response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Requested-With, Authorization'
+# Configuração de CORS - aplicada a TODAS as respostas
+def _set_cors_headers():
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Requested-With, Authorization'
+
+# Aplicar CORS para todas as requisições
+_set_cors_headers()
 
 # Função auxiliar para obter dados da requisição - igual ao Auralis
 def get_request_data():
@@ -19,8 +23,9 @@ def get_request_data():
         data = request.vars or {}
     return data
 
-# Endpoint OPTIONS básico
+# Endpoint OPTIONS básico - agora com CORS configurado corretamente
 def options():
+    _set_cors_headers()  # Garantir que os cabeçalhos CORS estão presentes
     return {}
 
 # Função para converter formato de data DD/MM/YYYY para YYYY-MM-DD
@@ -89,10 +94,12 @@ def eventos():
     """
     # Para requisições OPTIONS (preflight CORS)
     if request.env.request_method == 'OPTIONS':
+        _set_cors_headers()  # Garantir que os cabeçalhos CORS estão presentes
         return {}
     
     # Para requisições POST
     elif request.env.request_method == 'POST':
+        _set_cors_headers()  # Garantir que os cabeçalhos CORS estão presentes
         data = get_request_data()
         
         # Validar campos obrigatórios
