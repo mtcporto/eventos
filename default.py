@@ -2,15 +2,26 @@
 # Controlador default.py para o servidor Web2py em mtcporto.pythonanywhere.com
 # Versão compatível com Python 3
 
-# Configuração de CORS - melhorada para lidar com preflight requests
-def _set_cors_headers():
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Requested-With, Authorization, Accept, Origin'
-    response.headers['Access-Control-Max-Age'] = '86400'  # Cache preflight for 24 hours
+# Configuração de CORS simples - igual ao Auralis
+response.headers['Access-Control-Allow-Origin'] = '*'
+response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Requested-With, Authorization'
 
-# Aplica CORS headers em cada requisição
-_set_cors_headers()
+# Função auxiliar para obter dados da requisição - igual ao Auralis
+def get_request_data():
+    data = None
+    try:
+        data = request.json
+    except:
+        data = None
+    if not data:
+        # form-data ou x-www-form-urlencoded fallback
+        data = request.vars or {}
+    return data
+
+# Endpoint OPTIONS básico
+def options():
+    return {}
 
 # Definição da tabela t_eventos com campo f_imagem alterado para tipo 'upload'
 db.define_table('t_eventos',
@@ -26,90 +37,6 @@ db.define_table('t_eventos',
     Field('f_tipo', 'string', label='Tipo')
 )
 
-# Função auxiliar para obter dados da requisição - igual ao Auralis
-def get_request_data():
-    data = None
-    try:
-        data = request.json
-    except:
-        data = None
-    if not data:
-        # form-data ou x-www-form-urlencoded fallback
-        data = request.vars or {}
-    return data
-
-# Endpoint OPTIONS básico - importante para preflight CORS
-def options():
-    _set_cors_headers()  # Assegura que os headers estejam presentes
-    return {}
-
-# Função atualizada para lidar com upload de imagens como arquivos
-def salvar_imagem():
-    """
-    Endpoint para upload de imagens
-    POST: recebe um arquivo de imagem e salva no servidor
-    """
-    import os
-    import uuid
-    
-    if request.env.request_method != 'POST':
-        return response.json({
-            'error': 'Método não suportado'
-        }, status=405)
-    
-    # Verifica se foi enviado um arquivo
-    if not request.files or not request.files.get('imagem'):
-        return response.json({
-            'error': 'Nenhuma imagem enviada'
-        }, status=400)
-    
-    try:
-        # Obter o arquivo enviado
-        img_file = request.files.get('imagem')
-        
-        # Extrair a extensão e verificar se é uma imagem válida
-        filename = img_file.filename
-        extension = os.path.splitext(filename)[1].lower()
-        
-        if extension not in ['.jpg', '.jpeg', '.png', '.gif', '.webp']:
-            return response.json({
-                'error': 'Formato de imagem não suportado'
-            }, status=400)
-        
-        # Gerar um nome único para a imagem
-        img_name = f"{uuid.uuid4()}{extension}"
-        
-        # Diretório para salvar as imagens
-        img_dir = os.path.join(request.folder, 'static', 'uploads')
-        
-        # Criar o diretório se não existir
-        if not os.path.exists(img_dir):
-            os.makedirs(img_dir)
-        
-        # Caminho completo do arquivo
-        img_path = os.path.join(img_dir, img_name)
-        
-        # Salvar o arquivo
-        img_file.save(img_path)
-        
-        # URL relativa para a imagem
-        img_url = URL('static', 'uploads', img_name, host=True)
-        
-        return response.json({
-            'status': 'ok',
-            'url': img_url
-        })
-    
-    except Exception as e:
-        import traceback
-        tb = traceback.format_exc()
-        
-        return response.json({
-            'status': 'error',
-            'message': str(e),
-            'traceback': tb
-        }, status=500)
-
 # Endpoint para eventos - estruturado como os endpoints do Auralis
 def eventos():
     """
@@ -117,27 +44,23 @@ def eventos():
     GET: lista eventos
     POST: adiciona evento
     """
-    # Sempre aplicar headers CORS para qualquer tipo de request
-    _set_cors_headers()
-    
     # Para requisições OPTIONS (preflight CORS)
     if request.env.request_method == 'OPTIONS':
         return {}
     
     # Para requisições POST
     elif request.env.request_method == 'POST':
+        data = get_request_data()
+        
+        # Validar campos obrigatórios
+        campos_obrigatorios = ['oque', 'quando', 'onde', 'fonte', 'local']
+        for campo in campos_obrigatorios:
+            if campo not in data or not data[campo]:
+                return response.json({
+                    'error': 'Campo obrigatório ausente ou vazio: {0}'.format(campo)
+                })
+        
         try:
-            # Obter dados do formulário ou JSON
-            data = get_request_data()
-            
-            # Validar campos obrigatórios
-            campos_obrigatorios = ['oque', 'quando', 'onde', 'fonte', 'local']
-            for campo in campos_obrigatorios:
-                if campo not in data or not data[campo]:
-                    return response.json({
-                        'error': 'Campo obrigatório ausente ou vazio: {0}'.format(campo)
-                    })
-            
             # Inserir no banco
             evento_id = db.t_eventos.insert(
                 f_oque=data['oque'],
@@ -145,7 +68,7 @@ def eventos():
                 f_onde=data['onde'],
                 f_fonte=data['fonte'],
                 f_local=data['local'],
-                f_imagem=request.vars.get('imagem', None),  # Verifica o upload de arquivo
+                f_imagem=data.get('imagem', None),  # Armazena a imagem do cartaz do evento
                 f_endereco=data.get('endereco', None),
                 f_preco=data.get('preco', None),
                 f_descricao=data.get('descricao', None),
@@ -154,9 +77,6 @@ def eventos():
             
             # Commit explícito
             db.commit()
-            
-            # Log de sucesso
-            print("Evento cadastrado com sucesso, ID:", evento_id)
             
             return response.json({
                 'status': 'ok',
@@ -169,14 +89,13 @@ def eventos():
             import traceback
             
             # Log detalhado do erro
-            error_trace = traceback.format_exc()
-            print("ERRO AO CADASTRAR EVENTO:", str(e))
-            print(error_trace)
+            tb = traceback.format_exc()
+            print(tb)
             
             return response.json({
                 'status': 'error',
                 'message': str(e),
-                'traceback': error_trace
+                'traceback': tb
             }, status=500)
     
     # Para requisições GET - listar eventos
@@ -198,7 +117,7 @@ def eventos():
                     'onde': e.f_onde,
                     'local': e.f_local,
                     'fonte': e.f_fonte,
-                    'imagem': e.f_imagem,
+                    'imagem': e.f_imagem,  # Inclui a imagem na resposta
                     'endereco': e.f_endereco,
                     'preco': e.f_preco,
                     'descricao': e.f_descricao,
@@ -214,14 +133,13 @@ def eventos():
             import traceback
             
             # Log detalhado do erro
-            error_trace = traceback.format_exc()
-            print("ERRO AO LISTAR EVENTOS:", str(e))
-            print(error_trace)
+            tb = traceback.format_exc()
+            print(tb)
             
             return response.json({
                 'status': 'error',
                 'message': str(e),
-                'traceback': error_trace
+                'traceback': tb
             }, status=500)
     
     # Método não suportado
