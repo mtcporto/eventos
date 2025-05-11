@@ -541,7 +541,7 @@
         document.getElementById('loading').style.display = 'block';
         
         // Corrigido o endpoint para o correto na API externa
-        fetch('https://mtcporto.pythonanywhere.com/eventos/default/eventos')
+        fetch('https://mtcporto2.pythonanywhere.com/eventos/default/eventos')
           .then(response => {
             if (!response.ok) {
               throw new Error('Servidor retornou erro ' + response.status);
