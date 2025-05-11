@@ -363,440 +363,538 @@
     </div>
   </div>
   
+  <!-- Main content -->
+  <div class="container mt-4">
+    <div class="row mb-4">
+      <div class="col-md-6">
+        <h1>Eventos</h1>
+      </div>
+      <div class="col-md-6 text-end">
+        <button id="btnAddEvent" class="btn btn-primary">
+          <i class="fas fa-plus"></i> Novo Evento
+        </button>
+      </div>
+    </div>
+    
+    <!-- Filtros -->
+    <div class="row mb-4">
+      <div class="col-12">
+        <div class="btn-group" role="group" aria-label="Filtros de eventos">
+          <button type="button" class="btn btn-outline-primary filter-btn active" data-filter="todos">Todos</button>
+          <button type="button" class="btn btn-outline-primary filter-btn" data-filter="show">Shows</button>
+          <button type="button" class="btn btn-outline-primary filter-btn" data-filter="teatro">Teatro</button>
+          <button type="button" class="btn btn-outline-primary filter-btn" data-filter="exposicao">Exposição</button>
+          <button type="button" class="btn btn-outline-primary filter-btn" data-filter="workshop">Workshop</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Lista de eventos -->
+    <div id="eventos-container" class="row">
+      <!-- Os eventos serão carregados dinamicamente aqui -->
+    </div>
+  </div>
+  
+  <!-- Modal para adicionar/editar evento -->
+  <div class="modal fade" id="eventModal" tabindex="-1" aria-labelledby="eventModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="eventModalLabel">Novo Evento</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="alert alert-danger" id="formError" style="display: none;"></div>
+          <form id="eventForm" class="needs-validation" novalidate>
+            <input type="hidden" id="eventId">
+            <input type="hidden" id="imageUrl">
+            
+            <div class="row mb-3">
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="eventTitle" class="form-label">Título *</label>
+                  <input type="text" class="form-control" id="eventTitle" required>
+                </div>
+                
+                <div class="mb-3">
+                  <label for="eventDate" class="form-label">Data e Hora *</label>
+                  <input type="text" class="form-control" id="eventDate" placeholder="DD/MM/AAAA HH:MM" required>
+                  <small class="form-text text-muted">Formato: DD/MM/AAAA HH:MM</small>
+                </div>
+                
+                <div class="mb-3">
+                  <label for="eventPlace" class="form-label">Cidade *</label>
+                  <input type="text" class="form-control" id="eventPlace" required>
+                </div>
+                
+                <div class="mb-3">
+                  <label for="eventLocation" class="form-label">Local *</label>
+                  <input type="text" class="form-control" id="eventLocation" required>
+                </div>
+              </div>
+              
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="eventImage" class="form-label">Imagem</label>
+                  <div class="text-center border p-3 mb-2">
+                    <img id="imagePreview" src="" alt="Preview da imagem" style="max-width: 100%; max-height: 200px; display: none;">
+                    <div id="noImageIcon" class="d-flex justify-content-center align-items-center bg-light" style="height: 200px;">
+                      <i class="fas fa-image text-muted" style="font-size: 3rem;"></i>
+                    </div>
+                  </div>
+                  <div class="d-flex">
+                    <input type="file" class="form-control" id="eventImage" accept="image/*" style="display: none;">
+                    <button type="button" class="btn btn-outline-primary flex-grow-1 me-2" id="uploadImageBtn">
+                      <i class="fas fa-upload"></i> Selecionar imagem
+                    </button>
+                    <button type="button" class="btn btn-outline-danger" id="removeImageBtn" style="display: none;">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                  <small class="form-text text-muted">Tamanho máximo: 3MB</small>
+                </div>
+              </div>
+            </div>
+            
+            <div class="mb-3">
+              <label for="eventSource" class="form-label">Fonte *</label>
+              <input type="text" class="form-control" id="eventSource" required>
+            </div>
+            
+            <div class="row">
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="eventPrice" class="form-label">Preço</label>
+                  <input type="text" class="form-control" id="eventPrice" placeholder="Gratuito ou valor">
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="mb-3">
+                  <label for="eventType" class="form-label">Tipo</label>
+                  <select class="form-select" id="eventType">
+                    <option value="">Selecione</option>
+                    <option value="show">Show</option>
+                    <option value="teatro">Teatro</option>
+                    <option value="exposicao">Exposição</option>
+                    <option value="workshop">Workshop</option>
+                    <option value="outro">Outro</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="saveEventBtn">Salvar</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  
   <!-- Rodapé -->
   <footer class="footer">
     <div class="container">
       <p>Mini Agente de Eventos &copy; <span id="current-year">2025</span></p>
+      <button id="btnAddEvent" class="btn btn-primary position-fixed" style="bottom: 20px; right: 20px; border-radius: 50%; width: 60px; height: 60px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
+        <i class="fas fa-plus"></i>
+      </button>
     </div>
   </footer>
+  
+  <!-- Modal para adicionar/editar evento -->
+  <div class="modal fade" id="eventModal" tabindex="-1" aria-labelledby="eventModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title" id="eventModalLabel">Novo Evento</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fechar"></button>
+        </div>
+        <div class="modal-body">
+          <form id="eventForm">
+            <input type="hidden" id="eventId">
+            
+            <div class="mb-3">
+              <label for="eventTitle" class="form-label">O que?*</label>
+              <input type="text" class="form-control" id="eventTitle" required>
+            </div>
+            
+            <div class="mb-3">
+              <label for="eventDate" class="form-label">Quando?*</label>
+              <input type="text" class="form-control" id="eventDate" placeholder="DD/MM/YYYY HH:MM" required>
+            </div>
+            
+            <div class="mb-3">
+              <label for="eventPlace" class="form-label">Onde?*</label>
+              <input type="text" class="form-control" id="eventPlace" required>
+            </div>
+            
+            <div class="mb-3">
+              <label for="eventLocation" class="form-label">Local*</label>
+              <input type="text" class="form-control" id="eventLocation" required>
+            </div>
+            
+            <div class="mb-3">
+              <label for="eventSource" class="form-label">Fonte*</label>
+              <input type="text" class="form-control" id="eventSource" required>
+            </div>
+            
+            <div class="mb-3">
+              <label for="eventPrice" class="form-label">Preço</label>
+              <input type="text" class="form-control" id="eventPrice">
+            </div>
+            
+            <div class="mb-3">
+              <label for="eventType" class="form-label">Tipo</label>
+              <input type="text" class="form-control" id="eventType">
+            </div>
+            
+            <div class="mb-3">
+              <label for="eventImage" class="form-label">Imagem</label>
+              <div class="d-flex align-items-center">
+                <div class="image-preview me-3" style="width: 100px; height: 100px; overflow: hidden; background: #f0f0f0; border-radius: 4px; display: flex; align-items: center; justify-content: center;">
+                  <img id="imagePreview" src="" style="max-width: 100%; max-height: 100%; display: none;">
+                  <i id="noImageIcon" class="fas fa-image text-muted" style="font-size: 2rem;"></i>
+                </div>
+                <div>
+                  <input type="file" class="form-control" id="eventImage" accept="image/*" style="display: none;">
+                  <button type="button" id="uploadImageBtn" class="btn btn-outline-primary mb-2">
+                    <i class="fas fa-upload"></i> Selecionar imagem
+                  </button>
+                  <button type="button" id="removeImageBtn" class="btn btn-outline-danger" style="display: none;">
+                    <i class="fas fa-trash"></i> Remover
+                  </button>
+                </div>
+              </div>
+              <input type="hidden" id="imageUrl">
+            </div>
+            
+            <div class="alert alert-danger" id="formError" style="display: none;"></div>
+          </form>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+          <button type="button" class="btn btn-primary" id="saveEventBtn">Salvar</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Bootstrap e outros scripts -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
   <script>
-    // Variáveis globais
-    let allEventos = [];
-    let activeTab = 'upcoming';
-    let filters = {
-      local: '',
-      fonte: '',
-      search: ''
-    };
-    
-    // Inicializar a página
     document.addEventListener('DOMContentLoaded', function() {
-      // Definir o ano atual no rodapé
+      // Atualizar o ano atual no rodapé
       document.getElementById('current-year').textContent = new Date().getFullYear();
       
-      // Carregar eventos da API
-      carregarEventos();
-    });
-    
-    // Função para formatar uma data no formato brasileiro
-    function formatarData(dataString) {
-      // Esperando formato "DD/MM/YYYY HH:MM" ou similar
-      return dataString;
-    }
-    
-    // Função para calcular a diferença de dias entre duas datas
-    function calcularDiferencaDias(data) {
-      // Converter string de data para objeto Date
-      const partes = data.split(' ')[0].split('/');
-      if (partes.length < 3) return 999; // Data inválida ou sem ano
+      // Inicializar variáveis
+      let eventos = [];
+      let currentFilter = 'todos';
       
-      const dia = parseInt(partes[0]);
-      const mes = parseInt(partes[1]) - 1; // Mês em JS começa em 0
-      let ano = parseInt(partes[2]);
-      
-      // Verificar se o ano é válido (2 ou 4 dígitos)
-      if (ano < 100) {
-        // Se for ano com 2 dígitos, assume século 21
-        ano += 2000;
+      // Obter eventos do servidor
+      function fetchEventos() {
+        fetch('/eventos')
+          .then(response => response.json())
+          .then(data => {
+            eventos = data;
+            displayEventos(eventos);
+          })
+          .catch(error => console.error('Erro ao obter eventos:', error));
       }
       
-      // Se o ano for anterior ao atual, mas é um evento futuro, assume que é do próximo ano
-      const anoAtual = new Date().getFullYear();
-      if (ano < anoAtual) {
-        ano = anoAtual;
-      }
-      
-      const dataEvento = new Date(ano, mes, dia);
-      const hoje = new Date();
-      hoje.setHours(0, 0, 0, 0);
-      
-      // Calcular diferença em dias
-      const diffTime = dataEvento.getTime() - hoje.getTime();
-      const diffDias = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      
-      return diffDias;
-    }
-    
-    // Função para determinar em qual categoria o evento se encaixa
-    function categorizarEvento(evento) {
-      // Extrair apenas a parte da data (sem a hora)
-      const dataStr = evento.quando?.split(' ')[0];
-      if (!dataStr) return 'upcoming';
-      
-      const diffDias = calcularDiferencaDias(evento.quando);
-      
-      // Categorizar com base na diferença de dias
-      if (diffDias < 0) return 'past';
-      if (diffDias === 0) return 'today';
-      if (diffDias === 1) return 'tomorrow';
-      
-      // Verificar se é final de semana (próxima sexta, sábado ou domingo)
-      const hoje = new Date();
-      const diaSemanaHoje = hoje.getDay(); // 0 = domingo, 6 = sábado
-      
-      // Calcular dias até o próximo final de semana
-      let diasAteProximaSexta = 5 - diaSemanaHoje; // 5 = sexta
-      if (diasAteProximaSexta <= 0) diasAteProximaSexta += 7;
-      
-      let diasAteProximoDomingo = 7 - diaSemanaHoje + 0; // 0 = domingo
-      
-      // Se o evento é até o próximo domingo
-      if (diffDias <= diasAteProximoDomingo && diffDias >= diasAteProximaSexta) {
-        return 'weekend';
-      }
-      
-      return 'upcoming';
-    }
-    
-    // Função para verificar se um evento passa nos filtros atuais
-    function passaNosFiltros(evento) {
-      // Filtro de local
-      if (filters.local && evento.local !== filters.local) {
-        return false;
-      }
-      
-      // Filtro de fonte
-      if (filters.fonte && evento.fonte !== filters.fonte) {
-        return false;
-      }
-      
-      // Filtro de busca
-      if (filters.search) {
-        const searchLower = filters.search.toLowerCase();
-        const oqueLower = evento.oque?.toLowerCase() || '';
-        const localLower = evento.local?.toLowerCase() || '';
-        const fonteLower = evento.fonte?.toLowerCase() || '';
+      // Exibir eventos na interface
+      function displayEventos(eventos) {
+        const container = document.getElementById('eventos-container');
+        container.innerHTML = '';
         
-        if (!oqueLower.includes(searchLower) && 
-            !localLower.includes(searchLower) && 
-            !fonteLower.includes(searchLower)) {
-          return false;
-        }
-      }
-      
-      return true;
-    }
-    
-    // Função para criar um card de evento
-    function criarCardEvento(evento) {
-      // Determinar o status do evento (hoje, amanhã, próximo, passado)
-      const categoria = categorizarEvento(evento);
-      let badgeClass = 'badge-upcoming';
-      let badgeText = 'Em Breve';
-      
-      switch (categoria) {
-        case 'today':
-          badgeClass = 'badge-today';
-          badgeText = 'HOJE';
-          break;
-        case 'tomorrow':
-          badgeClass = 'badge-tomorrow';
-          badgeText = 'AMANHÃ';
-          break;
-        case 'weekend':
-          badgeClass = 'badge-week';
-          badgeText = 'FIM DE SEMANA';
-          break;
-        case 'past':
-          badgeClass = 'badge-past';
-          badgeText = 'EVENTO PASSADO';
-          break;
-      }
-      
-      // Construir a URL da imagem (se disponível)
-      const imgUrl = evento.imagem || '';
-      
-      // Criar o elemento HTML do card
-      const cardCol = document.createElement('div');
-      cardCol.className = 'col-lg-4 col-md-6 col-sm-12 mb-4';
-      
-      const cardHtml = `
-        <div class="card h-100">
-          ${imgUrl ? 
-            `<img src="${imgUrl}" class="card-img-top" alt="${evento.oque}">` :
-            `<div class="card-img-placeholder">
-               <i class="fas fa-calendar-alt"></i>
-             </div>`
-          }
-          <div class="card-body">
-            <p class="fonte">
-              <span class="badge">${evento.fonte || 'Desconhecida'}</span>
-              <span class="badge ${badgeClass} float-end">${badgeText}</span>
-            </p>
-            <h5 class="card-title">${evento.oque || 'Evento sem título'}</h5>
-            <p class="card-text"><i class="fas fa-calendar"></i> ${formatarData(evento.quando || 'Data não especificada')}</p>
-            <p class="card-text"><i class="fas fa-map-marker-alt"></i> ${evento.local || evento.onde || 'Local não especificado'}</p>
-            ${evento.preco ? `<p class="card-text"><i class="fas fa-ticket-alt"></i> ${evento.preco}</p>` : ''}
-            ${evento.tipo ? `<p class="card-text"><i class="fas fa-tag"></i> ${evento.tipo}</p>` : ''}
-          </div>
-        </div>
-      `;
-      
-      cardCol.innerHTML = cardHtml;
-      return cardCol;
-    }
-    
-    // Atualizar listas de eventos
-    function atualizarListasEventos() {
-      // Limpar os containers
-      const containers = [
-        'today-events', 'tomorrow-events', 'weekend-events', 'upcoming-events', 'past-events'
-      ];
-      
-      containers.forEach(id => {
-        document.getElementById(id).innerHTML = '';
-      });
-      
-      // Contadores para verificar se temos eventos em cada categoria
-      const contadores = {
-        today: 0,
-        tomorrow: 0,
-        weekend: 0,
-        upcoming: 0,
-        past: 0
-      };
-      
-      // Processar cada evento
-      allEventos.forEach(evento => {
-        if (!passaNosFiltros(evento)) return;
-        
-        // Categorizar o evento
-        const categoria = categorizarEvento(evento);
-        contadores[categoria]++;
-        
-        // Adicionar o card ao container apropriado
-        const card = criarCardEvento(evento);
-        document.getElementById(`${categoria}-events`).appendChild(card);
-      });
-      
-      // Mostrar/esconder containers baseado no conteúdo
-      document.getElementById('today-container').style.display = contadores.today > 0 ? 'block' : 'none';
-      document.getElementById('tomorrow-container').style.display = contadores.tomorrow > 0 ? 'block' : 'none';
-      document.getElementById('weekend-container').style.display = contadores.weekend > 0 ? 'block' : 'none';
-      document.getElementById('upcoming-container').style.display = contadores.upcoming > 0 ? 'block' : 'none';
-      document.getElementById('past-container').style.display = contadores.past > 0 ? 'block' : 'none';
-      
-      // Verificar se não temos eventos para mostrar na tab ativa
-      const temEventosVisiveis = (activeTab === 'upcoming' && (contadores.today + contadores.tomorrow + contadores.weekend + contadores.upcoming) > 0) ||
-                                (activeTab === 'today' && contadores.today > 0) ||
-                                (activeTab === 'weekend' && contadores.weekend > 0) ||
-                                (activeTab === 'past' && contadores.past > 0);
-      
-      document.getElementById('no-events').style.display = temEventosVisiveis ? 'none' : 'block';
-      
-      // Mostrar/esconder containers com base na tab ativa
-      mostrarContainersPorTab();
-    }
-    
-    // Mostrar ou esconder containers baseado na tab ativa
-    function mostrarContainersPorTab() {
-      // Ajustar visibilidade com base na tab
-      const containers = document.querySelectorAll('.event-container');
-      containers.forEach(container => {
-        container.style.display = 'none';
-      });
-      
-      // Mostrar containers específicos baseados na tab ativa
-      switch(activeTab) {
-        case 'upcoming':
-          document.getElementById('today-container').style.display = 'block';
-          document.getElementById('tomorrow-container').style.display = 'block';
-          document.getElementById('weekend-container').style.display = 'block';
-          document.getElementById('upcoming-container').style.display = 'block';
-          break;
-          
-        case 'today':
-          document.getElementById('today-container').style.display = 'block';
-          break;
-          
-        case 'weekend':
-          document.getElementById('weekend-container').style.display = 'block';
-          break;
-          
-        case 'past':
-          document.getElementById('past-container').style.display = 'block';
-          break;
-      }
-    }
-    
-    // Definir a tab ativa
-    function setActiveTab(element, tabName) {
-      // Atualizar a UI
-      document.querySelectorAll('.tab').forEach(tab => {
-        tab.classList.remove('active');
-      });
-      element.classList.add('active');
-      
-      // Atualizar a variável
-      activeTab = tabName;
-      
-      // Atualizar a visibilidade dos containers
-      mostrarContainersPorTab();
-      
-      // Verificar se precisamos mostrar a mensagem de "nenhum evento"
-      verificarEventosDisponiveis();
-    }
-    
-    // Verificar se há eventos disponíveis na tab atual
-    function verificarEventosDisponiveis() {
-      let temEventos = false;
-      
-      // Verificar se há eventos na tab ativa
-      switch(activeTab) {
-        case 'upcoming':
-          temEventos = document.querySelectorAll('#today-events .card, #tomorrow-events .card, #weekend-events .card, #upcoming-events .card').length > 0;
-          break;
-          
-        case 'today':
-          temEventos = document.querySelectorAll('#today-events .card').length > 0;
-          break;
-          
-        case 'weekend':
-          temEventos = document.querySelectorAll('#weekend-events .card').length > 0;
-          break;
-          
-        case 'past':
-          temEventos = document.querySelectorAll('#past-events .card').length > 0;
-          break;
-      }
-      
-      // Mostrar ou esconder a mensagem de "nenhum evento"
-      document.getElementById('no-events').style.display = temEventos ? 'none' : 'block';
-    }
-    
-    // Função para preencher os seletores de filtro
-    function preencherSeletoresFiltro() {
-      // Obter listas únicas de locais e fontes
-      const locais = new Set();
-      const fontes = new Set();
-      
-      allEventos.forEach(evento => {
-        if (evento.local) locais.add(evento.local);
-        if (evento.fonte) fontes.add(evento.fonte);
-      });
-      
-      // Preencher o seletor de locais
-      const seletorLocal = document.getElementById('filterLocal');
-      seletorLocal.innerHTML = '<option value="">Todos os locais</option>';
-      
-      Array.from(locais).sort().forEach(local => {
-        const option = document.createElement('option');
-        option.value = local;
-        option.textContent = local;
-        seletorLocal.appendChild(option);
-      });
-      
-      // Preencher o seletor de fontes
-      const seletorFonte = document.getElementById('filterFonte');
-      seletorFonte.innerHTML = '<option value="">Todas as fontes</option>';
-      
-      Array.from(fontes).sort().forEach(fonte => {
-        const option = document.createElement('option');
-        option.value = fonte;
-        option.textContent = fonte;
-        seletorFonte.appendChild(option);
-      });
-    }
-    
-    // Função para aplicar os filtros
-    function aplicarFiltros() {
-      // Atualizar os filtros
-      filters.local = document.getElementById('filterLocal').value;
-      filters.fonte = document.getElementById('filterFonte').value;
-      filters.search = document.getElementById('searchQuery').value;
-      
-      // Atualizar as listas de eventos
-      atualizarListasEventos();
-    }
-    
-    // Função para corrigir datas de eventos
-    function corrigirDatasEventos(eventos) {
-      const anoAtual = new Date().getFullYear();
-      
-      return eventos.map(evento => {
-        const eventoCorrigido = {...evento};
-        
-        if (eventoCorrigido.quando) {
-          const partes = eventoCorrigido.quando.split(' ');
-          if (partes.length > 0) {
-            const dataPartes = partes[0].split('/');
-            if (dataPartes.length >= 3) {
-              // Verificar se o ano é válido e corrigir se necessário
-              let ano = parseInt(dataPartes[2]);
-              
-              // Corrigir ano se for inválido ou passado
-              if (isNaN(ano) || ano < 100) {
-                ano = anoAtual;
-              } else if (ano < 2000) {
-                ano += 2000;
-              }
-              
-              // Se o ano está no passado e não é um evento antigo intencional,
-              // ajustar para o ano atual
-              if (ano < anoAtual) {
-                ano = anoAtual;
-              }
-              
-              // Reconstruir a data
-              const novaData = `${dataPartes[0]}/${dataPartes[1]}/${ano}`;
-              
-              if (partes.length > 1) {
-                eventoCorrigido.quando = `${novaData} ${partes[1]}`;
-              } else {
-                eventoCorrigido.quando = novaData;
-              }
-            }
-          }
+        if (eventos.length === 0) {
+          container.innerHTML = '<div class="col-12"><p class="text-center">Nenhum evento encontrado.</p></div>';
+          return;
         }
         
-        return eventoCorrigido;
-      });
-    }
-    
-    // Função para carregar eventos da API
-    async function carregarEventos(forceRefresh = false) {
-      // Mostrar indicador de carregamento
-      document.getElementById('loading').style.display = 'block';
-      
-      try {
-        // Buscar dados da API
-        const response = await fetch('https://mtcporto2.pythonanywhere.com/eventos/default/eventos');
-        const data = await response.json();
+        eventos.forEach(evento => {
+          const date = new Date(evento.quando);
+          const formattedDate = `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+          const imgUrl = evento.imagem || '';
+          
+          const card = document.createElement('div');
+          card.className = 'col-md-4 mb-4';
+          card.innerHTML = `
+            <div class="card h-100">
+              ${imgUrl ? `<img src="${imgUrl}" class="card-img-top" alt="${evento.oque}">` : '<div class="no-image-placeholder d-flex justify-content-center align-items-center bg-light" style="height: 200px;"><i class="fas fa-image text-muted" style="font-size: 3rem;"></i></div>'}
+              <div class="card-body">
+                <h5 class="card-title">${evento.oque}</h5>
+                <p class="card-text">
+                  <i class="fas fa-calendar-alt"></i> ${formattedDate}<br>
+                  <i class="fas fa-map-marker-alt"></i> ${evento.onde} - ${evento.local}<br>
+                  ${evento.preco ? `<i class="fas fa-tag"></i> ${evento.preco}<br>` : ''}
+                  ${evento.tipo ? `<span class="badge bg-secondary">${evento.tipo}</span>` : ''}
+                </p>
+                <p class="card-text"><small class="text-muted">Fonte: ${evento.fonte}</small></p>
+              </div>
+              <div class="card-footer d-flex justify-content-end">
+                <button class="btn btn-sm btn-outline-primary me-2 edit-event" data-id="${evento.id}">
+                  <i class="fas fa-edit"></i> Editar
+                </button>
+                <button class="btn btn-sm btn-outline-danger delete-event" data-id="${evento.id}">
+                  <i class="fas fa-trash"></i> Excluir
+                </button>
+              </div>
+            </div>
+          `;
+          
+          container.appendChild(card);
+        });
         
-        if (data && data.eventos) {
-          // Corrigir datas e armazenar eventos
-          allEventos = corrigirDatasEventos(data.eventos);
+        // Adicionar event listeners para os botões de editar e excluir
+        document.querySelectorAll('.edit-event').forEach(btn => {
+          btn.addEventListener('click', function() {
+            const id = this.getAttribute('data-id');
+            editEvent(id);
+          });
+        });
+        
+        document.querySelectorAll('.delete-event').forEach(btn => {
+          btn.addEventListener('click', function() {
+            const id = this.getAttribute('data-id');
+            deleteEvent(id);
+          });
+        });
+      }
+      
+      // Filtrar eventos por tipo
+      function filterEventos(tipo) {
+        currentFilter = tipo;
+        const filtered = tipo === 'todos' ? eventos : eventos.filter(evento => evento.tipo === tipo);
+        displayEventos(filtered);
+        
+        // Atualizar UI dos botões de filtro
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+          if (btn.getAttribute('data-filter') === tipo) {
+            btn.classList.add('active');
+          } else {
+            btn.classList.remove('active');
+          }
+        });
+      }
+      
+      // Configurar listeners para os botões de filtro
+      document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const filter = this.getAttribute('data-filter');
+          filterEventos(filter);
+        });
+      });
+      
+      // Modal e formulário de eventos
+      const eventModal = new bootstrap.Modal(document.getElementById('eventModal'));
+      const eventForm = document.getElementById('eventForm');
+      const formError = document.getElementById('formError');
+      let isEditing = false;
+      let currentImageFile = null;
+      
+      // Configurar upload de imagens
+      document.getElementById('uploadImageBtn').addEventListener('click', function() {
+        document.getElementById('eventImage').click();
+      });
+      
+      document.getElementById('eventImage').addEventListener('change', function(e) {
+        if (e.target.files && e.target.files[0]) {
+          const file = e.target.files[0];
+          currentImageFile = file;
           
-          // Preencher seletores de filtro
-          preencherSeletoresFiltro();
+          // Verificar tamanho da imagem (limite de 3MB)
+          if (file.size > 3 * 1024 * 1024) {
+            alert('A imagem não pode ter mais de 3MB.');
+            e.target.value = '';
+            return;
+          }
           
-          // Atualizar listas de eventos
-          atualizarListasEventos();
+          const reader = new FileReader();
+          reader.onload = function(e) {
+            document.getElementById('imagePreview').src = e.target.result;
+            document.getElementById('imagePreview').style.display = 'block';
+            document.getElementById('noImageIcon').style.display = 'none';
+            document.getElementById('removeImageBtn').style.display = 'inline-block';
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+      
+      document.getElementById('removeImageBtn').addEventListener('click', function() {
+        document.getElementById('eventImage').value = '';
+        document.getElementById('imagePreview').src = '';
+        document.getElementById('imagePreview').style.display = 'none';
+        document.getElementById('noImageIcon').style.display = 'block';
+        document.getElementById('removeImageBtn').style.display = 'none';
+        document.getElementById('imageUrl').value = '';
+        currentImageFile = null;
+      });
+      
+      // Abrir modal para novo evento
+      document.getElementById('btnAddEvent').addEventListener('click', function() {
+        resetForm();
+        document.getElementById('eventModalLabel').textContent = 'Novo Evento';
+        isEditing = false;
+        eventModal.show();
+      });
+      
+      // Editar evento existente
+      function editEvent(id) {
+        const evento = eventos.find(e => e.id == id);
+        if (!evento) return;
+        
+        isEditing = true;
+        document.getElementById('eventModalLabel').textContent = 'Editar Evento';
+        
+        // Preencher o formulário
+        document.getElementById('eventId').value = evento.id;
+        document.getElementById('eventTitle').value = evento.oque;
+        
+        const date = new Date(evento.quando);
+        document.getElementById('eventDate').value = `${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}/${date.getFullYear()} ${date.getHours().toString().padStart(2, '0')}:${date.getMinutes().toString().padStart(2, '0')}`;
+        
+        document.getElementById('eventPlace').value = evento.onde;
+        document.getElementById('eventLocation').value = evento.local;
+        document.getElementById('eventSource').value = evento.fonte;
+        document.getElementById('eventPrice').value = evento.preco || '';
+        document.getElementById('eventType').value = evento.tipo || '';
+        
+        // Exibir imagem se existir
+        if (evento.imagem) {
+          document.getElementById('imageUrl').value = evento.imagem;
+          document.getElementById('imagePreview').src = evento.imagem;
+          document.getElementById('imagePreview').style.display = 'block';
+          document.getElementById('noImageIcon').style.display = 'none';
+          document.getElementById('removeImageBtn').style.display = 'inline-block';
         } else {
-          // Exibir erro se não houver dados
-          document.getElementById('no-events').style.display = 'block';
+          document.getElementById('imagePreview').style.display = 'none';
+          document.getElementById('noImageIcon').style.display = 'block';
+          document.getElementById('removeImageBtn').style.display = 'none';
         }
-      } catch (error) {
-        console.error('Erro ao carregar eventos:', error);
-        document.getElementById('no-events').style.display = 'block';
-      } finally {
-        // Ocultar o indicador de carregamento
-        document.getElementById('loading').style.display = 'none';
+        
+        eventModal.show();
       }
-    }
+      
+      // Salvar evento (criar ou atualizar)
+      document.getElementById('saveEventBtn').addEventListener('click', async function() {
+        if (!eventForm.checkValidity()) {
+          eventForm.reportValidity();
+          return;
+        }
+        
+        formError.style.display = 'none';
+        
+        try {
+          // Preparar dados do evento
+          const eventData = {
+            oque: document.getElementById('eventTitle').value,
+            onde: document.getElementById('eventPlace').value,
+            local: document.getElementById('eventLocation').value,
+            fonte: document.getElementById('eventSource').value,
+            preco: document.getElementById('eventPrice').value || null,
+            tipo: document.getElementById('eventType').value || null
+          };
+          
+          // Processar data
+          const dateStr = document.getElementById('eventDate').value;
+          const dateParts = dateStr.split(' ')[0].split('/');
+          const timeParts = dateStr.split(' ')[1].split(':');
+          
+          const quando = new Date(
+            parseInt(dateParts[2]), // ano
+            parseInt(dateParts[1]) - 1, // mês (0-11)
+            parseInt(dateParts[0]), // dia
+            parseInt(timeParts[0]), // hora
+            parseInt(timeParts[1])  // minutos
+          );
+          
+          eventData.quando = quando.toISOString();
+          
+          // Processar imagem se houver uma nova
+          if (currentImageFile) {
+            const formData = new FormData();
+            formData.append('imagem', currentImageFile);
+            
+            const imageResponse = await fetch('/upload_imagem', {
+              method: 'POST',
+              body: formData
+            });
+            
+            if (!imageResponse.ok) {
+              throw new Error('Falha ao enviar imagem');
+            }
+            
+            const imageData = await imageResponse.json();
+            eventData.imagem = imageData.url;
+          } else if (document.getElementById('imageUrl').value) {
+            // Manter a imagem existente se não foi alterada
+            eventData.imagem = document.getElementById('imageUrl').value;
+          }
+          
+          // ID para edição
+          const eventId = document.getElementById('eventId').value;
+          
+          const url = isEditing ? `/eventos/${eventId}` : '/eventos';
+          const method = isEditing ? 'PUT' : 'POST';
+          
+          const response = await fetch(url, {
+            method: method,
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(eventData)
+          });
+          
+          if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Erro ao salvar evento');
+          }
+          
+          // Fechar modal e atualizar lista
+          eventModal.hide();
+          fetchEventos();
+          
+        } catch (error) {
+          formError.textContent = error.message;
+          formError.style.display = 'block';
+        }
+      });
+      
+      // Excluir evento
+      function deleteEvent(id) {
+        if (confirm('Tem certeza que deseja excluir este evento?')) {
+          fetch(`/eventos/${id}`, {
+            method: 'DELETE'
+          })
+          .then(response => {
+            if (response.ok) {
+              fetchEventos();
+            } else {
+              alert('Erro ao excluir evento');
+            }
+          })
+          .catch(error => console.error('Erro:', error));
+        }
+      }
+      
+      // Resetar formulário
+      function resetForm() {
+        eventForm.reset();
+        document.getElementById('eventId').value = '';
+        document.getElementById('imageUrl').value = '';
+        document.getElementById('imagePreview').src = '';
+        document.getElementById('imagePreview').style.display = 'none';
+        document.getElementById('noImageIcon').style.display = 'block';
+        document.getElementById('removeImageBtn').style.display = 'none';
+        currentImageFile = null;
+        formError.style.display = 'none';
+      }
+      
+      // Buscar eventos ao carregar a página
+      fetchEventos();
+    });
   </script>
 </body>
 </html>
