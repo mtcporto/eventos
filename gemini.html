@@ -975,45 +975,16 @@
           const descricao = getValueByLabel('Descrição');
           if (descricao) evento.descricao = descricao;
           
-          // Criar objeto FormData para upload de arquivo
-          const formData = new FormData();
-          
-          // Adicionar todos os dados do evento ao FormData
-          Object.entries(evento).forEach(([key, value]) => {
-            formData.append(key, value);
-          });
-          
-          // Adicionar a imagem como arquivo se disponível
-          if (lastImageData) {
-            // Converter base64 para Blob
-            const base64Data = lastImageData.split(',')[1];
-            const mimeType = lastImageData.match(/data:([^;]+);/)[1];
-            const byteCharacters = atob(base64Data);
-            const byteArrays = [];
-            
-            for (let i = 0; i < byteCharacters.length; i += 512) {
-              const slice = byteCharacters.slice(i, i + 512);
-              const byteNumbers = new Array(slice.length);
-              
-              for (let j = 0; j < slice.length; j++) {
-                byteNumbers[j] = slice.charCodeAt(j);
-              }
-              
-              byteArrays.push(new Uint8Array(byteNumbers));
-            }
-            
-            const blob = new Blob(byteArrays, {type: mimeType});
-            const file = new File([blob], "evento-imagem.jpg", {type: mimeType});
-            formData.append('imagem', file);
-          }
-          
-          // Registrar o que será enviado
           console.log("Enviando evento:", evento);
           
-          // Enviar requisição fetch com FormData (inclui o arquivo)
+          // Não enviar a imagem diretamente - converta apenas o JSON
+          // Isso ajuda a evitar problemas de CORS com imagens grandes
           const response = await fetch(apiUrl, {
             method: 'POST',
-            body: formData
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(evento)
           });
           
           if (response.ok) {
@@ -1021,7 +992,8 @@
             console.log("Resposta da API:", result);
             sucessos++;
           } else {
-            throw new Error(`Erro na API: ${response.status}`);
+            const errorText = await response.text();
+            throw new Error(`Erro na API (${response.status}): ${errorText}`);
           }
         } catch (error) {
           console.error("Erro ao processar evento:", error);
