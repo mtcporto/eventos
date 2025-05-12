@@ -342,7 +342,7 @@
     const GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
     
     // Endpoint da API Web2py real
-    const API_ENDPOINT = "https://mtcporto.pythonanywhere.com/eventos/default/eventos";
+    const API_ENDPOINT = "https://eventos.mosaicoworkers.workers.dev/";
 
     // --- Variáveis globais ---
     let rawText = "";
@@ -938,7 +938,7 @@
       const sendButton = document.getElementById('sendButton');
       sendButton.disabled = true;
       sendButton.textContent = 'Enviando...';
-      const apiUrl = 'https://mtcporto.pythonanywhere.com/eventos/default/eventos';
+      const apiUrl = 'https://eventos.mosaicoworkers.workers.dev/';
       let sucessos = 0;
       let falhas = 0;
       let mensagens = [];
