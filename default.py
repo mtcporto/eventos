@@ -81,29 +81,24 @@ def eventos():
                 })
 
         try:
-            import uuid
             quando_convertido = converter_formato_data(data['quando'])
             imagem_upload = data.get('imagem')
-            nome_arquivo_imagem = None
 
-            # Validação e renomeação segura da imagem (caso enviada)
+            # Validação de extensão permitida (opcional)
             if imagem_upload and hasattr(imagem_upload, 'filename'):
                 ext = imagem_upload.filename.split('.')[-1].lower()
                 if ext not in ['jpg', 'jpeg', 'png']:
                     response.status = 400
                     return response.json({'error': 'Formato de imagem não permitido'})
 
-                # Gera nome único
-                nome_arquivo_imagem = f"evento_{uuid.uuid4().hex}.{ext}"
-                imagem_upload.filename = nome_arquivo_imagem
-
+            # Web2py vai gerar o nome e salvar corretamente
             evento_id = db.t_eventos.insert(
                 f_oque=data['oque'],
                 f_quando=quando_convertido,
                 f_onde=data['onde'],
                 f_fonte=data['fonte'],
                 f_local=data['local'],
-                f_imagem=imagem_upload,  # Salva com novo nome
+                f_imagem=imagem_upload,
                 f_endereco=data.get('endereco'),
                 f_preco=data.get('preco'),
                 f_descricao=data.get('descricao'),
@@ -113,8 +108,7 @@ def eventos():
             db.commit()
             return response.json({
                 'status': 'ok',
-                'id': evento_id,
-                'imagem': nome_arquivo_imagem  # ← retorna nome do arquivo
+                'id': evento_id
             })
 
         except Exception as e:
@@ -166,6 +160,7 @@ def eventos():
     else:
         response.status = 405
         return response.json({'error': 'Método não suportado'})
+
 
 
 # Página de teste da API
