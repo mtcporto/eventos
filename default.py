@@ -62,7 +62,6 @@ def imagem():
     return open(caminho, 'rb').read()
 
 
-# Endpoint para eventos
 def eventos():
     if request.env.request_method == 'OPTIONS':
         _set_cors_headers()
@@ -76,9 +75,10 @@ def eventos():
         campos_obrigatorios = ['oque', 'quando', 'onde', 'fonte', 'local']
         for campo in campos_obrigatorios:
             if campo not in data or not data[campo]:
+                response.status = 400
                 return response.json({
                     'error': f"Campo obrigatório ausente ou vazio: {campo}"
-                }, status=400)
+                })
 
         try:
             import uuid
@@ -90,7 +90,8 @@ def eventos():
             if imagem_upload and hasattr(imagem_upload, 'filename'):
                 ext = imagem_upload.filename.split('.')[-1].lower()
                 if ext not in ['jpg', 'jpeg', 'png']:
-                    return response.json({'error': 'Formato de imagem não permitido'}, status=400)
+                    response.status = 400
+                    return response.json({'error': 'Formato de imagem não permitido'})
 
                 # Gera nome único
                 nome_arquivo_imagem = f"evento_{uuid.uuid4().hex}.{ext}"
@@ -102,7 +103,7 @@ def eventos():
                 f_onde=data['onde'],
                 f_fonte=data['fonte'],
                 f_local=data['local'],
-                f_imagem=imagem_upload,  # Vai salvar com o novo nome
+                f_imagem=imagem_upload,  # Salva com novo nome
                 f_endereco=data.get('endereco'),
                 f_preco=data.get('preco'),
                 f_descricao=data.get('descricao'),
@@ -113,7 +114,7 @@ def eventos():
             return response.json({
                 'status': 'ok',
                 'id': evento_id,
-                'imagem': nome_arquivo_imagem  # ← Nome real do arquivo
+                'imagem': nome_arquivo_imagem  # ← retorna nome do arquivo
             })
 
         except Exception as e:
@@ -121,12 +122,12 @@ def eventos():
             import traceback
             tb = traceback.format_exc()
             print(tb)
+            response.status = 500
             return response.json({
                 'status': 'error',
                 'message': str(e),
                 'traceback': tb
-            }, status=500)
-
+            })
 
     elif request.env.request_method == 'GET':
         try:
@@ -155,16 +156,17 @@ def eventos():
             import traceback
             tb = traceback.format_exc()
             print(tb)
+            response.status = 500
             return response.json({
                 'status': 'error',
                 'message': str(e),
                 'traceback': tb
-            }, status=500)
+            })
 
     else:
-        return response.json({
-            'error': 'Método não suportado'
-        }, status=405)
+        response.status = 405
+        return response.json({'error': 'Método não suportado'})
+
 
 # Página de teste da API
 def api_teste():
