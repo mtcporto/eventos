@@ -11,173 +11,128 @@ def _set_cors_headers():
 # Aplicar CORS para todas as requisições
 _set_cors_headers()
 
-# Função auxiliar para obter dados da requisição - igual ao Auralis
+# Função auxiliar para obter dados da requisição
 def get_request_data():
-    data = None
     try:
-        data = request.json
+        return request.json
     except:
-        data = None
-    if not data:
-        # form-data ou x-www-form-urlencoded fallback
-        data = request.vars or {}
-    return data
+        return request.vars or {}
 
-# Endpoint OPTIONS básico - agora com CORS configurado corretamente
+# Endpoint OPTIONS básico
 def options():
-    _set_cors_headers()  # Garantir que os cabeçalhos CORS estão presentes
+    _set_cors_headers()
     return {}
 
 # Função para converter formato de data DD/MM/YYYY para YYYY-MM-DD
 def converter_formato_data(data_str):
     from datetime import datetime
     try:
-        # Verificar se tem formato DD/MM/YYYY ou DD/MM/YYYY HH:MM
         if '/' in data_str:
-            if ' ' in data_str:  # Se tem hora
+            if ' ' in data_str:
                 data_parte, hora_parte = data_str.split(' ', 1)
                 dia, mes, ano = data_parte.split('/')
-                # Formatar como YYYY-MM-DD HH:MM
                 return f"{ano}-{mes}-{dia} {hora_parte}"
-            else:  # Se tem só data
+            else:
                 dia, mes, ano = data_str.split('/')
-                # Formatar como YYYY-MM-DD
                 return f"{ano}-{mes}-{dia}"
-        return data_str  # Retorna sem modificar se não for no formato esperado
+        return data_str
     except Exception as e:
         print(f"Erro ao converter data: {e}")
         return data_str
 
-# Função para processar imagem base64 para o formato correto de upload
-def processar_imagem_base64(imagem_base64):
-    import base64
-    import os
-    import uuid
-    from io import BytesIO
-    
-    if not imagem_base64:
-        return None
-        
-    try:
-        # Verificar se é uma string base64
-        if isinstance(imagem_base64, str) and imagem_base64.startswith('data:'):
-            # Extrair tipo e dados
-            formato, dados_base64 = imagem_base64.split(',', 1)
-            
-            # Determinar extensão do arquivo
-            extensao = 'png'  # extensão padrão
-            if 'jpeg' in formato or 'jpg' in formato:
-                extensao = 'jpg'
-            elif 'png' in formato:
-                extensao = 'png'
-            
-            # Decodificar dados base64
-            dados_imagem = base64.b64decode(dados_base64)
-            
-            # Criar nome de arquivo único
-            nome_arquivo = f"evento_{uuid.uuid4().hex}.{extensao}"
-            
-            # Retornar tupla no formato esperado pelo campo upload
-            return (BytesIO(dados_imagem), nome_arquivo)
-    except Exception as e:
-        print(f"Erro ao processar imagem base64: {e}")
-    
-    return imagem_base64  # Retornar original se não for base64 ou ocorrer erro
-
+# Servir imagem de evento com CORS liberado
 def imagem():
-    """Endpoint para servir imagem de evento com CORS liberado"""
     _set_cors_headers()
     import os
     from gluon.contenttype import contenttype
+
     nome_arquivo = request.args(0)
     if not nome_arquivo:
-        return response.json({'error': 'Arquivo não especificado'}, status=400)
+        response.status = 400
+        return response.json({'error': 'Arquivo não especificado'})
+
     caminho = os.path.join(request.folder, 'uploads', nome_arquivo)
+
     if not os.path.isfile(caminho):
-        return response.json({'error': 'Arquivo não encontrado'}, status=404)
+        response.status = 404
+        return response.json({'error': 'Arquivo não encontrado'})
+
     response.headers['Content-Type'] = contenttype(nome_arquivo)
     response.headers['Access-Control-Allow-Origin'] = '*'
     return open(caminho, 'rb').read()
 
-# Endpoint para eventos - estruturado como os endpoints do Auralis
+
+# Endpoint para eventos
 def eventos():
-    """
-    API para eventos
-    GET: lista eventos
-    POST: adiciona evento
-    """
-    # Para requisições OPTIONS (preflight CORS)
     if request.env.request_method == 'OPTIONS':
-        _set_cors_headers()  # Garantir que os cabeçalhos CORS estão presentes
+        _set_cors_headers()
         return {}
-    
-    # Para requisições POST
+
     elif request.env.request_method == 'POST':
-        _set_cors_headers()  # Garantir que os cabeçalhos CORS estão presentes
+        _set_cors_headers()
         data = get_request_data()
-        
+
         # Validar campos obrigatórios
         campos_obrigatorios = ['oque', 'quando', 'onde', 'fonte', 'local']
         for campo in campos_obrigatorios:
             if campo not in data or not data[campo]:
                 return response.json({
-                    'error': 'Campo obrigatório ausente ou vazio: {0}'.format(campo)
-                })
-        
+                    'error': f"Campo obrigatório ausente ou vazio: {campo}"
+                }, status=400)
+
         try:
-            # Converter formato da data se necessário
+            import uuid
             quando_convertido = converter_formato_data(data['quando'])
-            
-            # Processar imagem se presente
-            imagem_processada = processar_imagem_base64(data.get('imagem', None))
-            
-            # Inserir no banco
+            imagem_upload = data.get('imagem')
+            nome_arquivo_imagem = None
+
+            # Validação e renomeação segura da imagem (caso enviada)
+            if imagem_upload and hasattr(imagem_upload, 'filename'):
+                ext = imagem_upload.filename.split('.')[-1].lower()
+                if ext not in ['jpg', 'jpeg', 'png']:
+                    return response.json({'error': 'Formato de imagem não permitido'}, status=400)
+
+                # Gera nome único
+                nome_arquivo_imagem = f"evento_{uuid.uuid4().hex}.{ext}"
+                imagem_upload.filename = nome_arquivo_imagem
+
             evento_id = db.t_eventos.insert(
                 f_oque=data['oque'],
-                f_quando=quando_convertido,  # Usar data convertida
+                f_quando=quando_convertido,
                 f_onde=data['onde'],
                 f_fonte=data['fonte'],
                 f_local=data['local'],
-                f_imagem=imagem_processada,  # Usar imagem processada
-                f_endereco=data.get('endereco', None),
-                f_preco=data.get('preco', None),
-                f_descricao=data.get('descricao', None),
-                f_tipo=data.get('tipo', None),
+                f_imagem=imagem_upload,  # Vai salvar com o novo nome
+                f_endereco=data.get('endereco'),
+                f_preco=data.get('preco'),
+                f_descricao=data.get('descricao'),
+                f_tipo=data.get('tipo')
             )
-            
-            # Commit explícito
+
             db.commit()
-            
             return response.json({
                 'status': 'ok',
-                'id': evento_id
+                'id': evento_id,
+                'imagem': nome_arquivo_imagem  # ← Nome real do arquivo
             })
-        
+
         except Exception as e:
-            # Rollback em caso de erro
             db.rollback()
             import traceback
-            
-            # Log detalhado do erro
             tb = traceback.format_exc()
             print(tb)
-            
             return response.json({
                 'status': 'error',
                 'message': str(e),
                 'traceback': tb
             }, status=500)
-    
-    # Para requisições GET - listar eventos
+
+
     elif request.env.request_method == 'GET':
         try:
-            # Query padrão
             query = (db.t_eventos.id > 0)
-            
-            # Pega resultados do banco
             eventos = db(query).select(orderby=~db.t_eventos.id)
-            
-            # Formata saída
+
             resultado = []
             for e in eventos:
                 resultado.append({
@@ -187,38 +142,30 @@ def eventos():
                     'onde': e.f_onde,
                     'local': e.f_local,
                     'fonte': e.f_fonte,
-                    'imagem': e.f_imagem,  # Agora só o nome do arquivo
+                    'imagem': e.f_imagem,
                     'endereco': e.f_endereco,
                     'preco': e.f_preco,
                     'descricao': e.f_descricao,
                     'tipo': e.f_tipo
                 })
-            
-            # Retorna JSON com resultados no formato esperado pelo frontend
-            return response.json({
-                'eventos': resultado
-            })
-        
+
+            return response.json({'eventos': resultado})
+
         except Exception as e:
             import traceback
-            
-            # Log detalhado do erro
             tb = traceback.format_exc()
             print(tb)
-            
             return response.json({
                 'status': 'error',
                 'message': str(e),
                 'traceback': tb
             }, status=500)
-    
-    # Método não suportado
+
     else:
         return response.json({
             'error': 'Método não suportado'
         }, status=405)
 
-# Para testar o funcionamento
+# Página de teste da API
 def api_teste():
-    """Página para testar a API de eventos"""
     return dict(message="API de eventos está funcionando corretamente")
