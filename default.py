@@ -1,29 +1,23 @@
 # -*- coding: utf-8 -*-
 # Controlador default.py para o servidor Web2py em mtcporto.pythonanywhere.com
-# Versão compatível com Python 3
 
-# Configuração de CORS - aplicada a TODAS as respostas
 def _set_cors_headers():
     response.headers['Access-Control-Allow-Origin'] = '*'
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Requested-With, Authorization'
 
-# Aplicar CORS para todas as requisições
 _set_cors_headers()
 
-# Função auxiliar para obter dados da requisição
 def get_request_data():
     try:
         return request.json
     except:
         return request.vars or {}
 
-# Endpoint OPTIONS básico
 def options():
     _set_cors_headers()
     return {}
 
-# Função para converter formato de data DD/MM/YYYY para YYYY-MM-DD
 def converter_formato_data(data_str):
     from datetime import datetime
     try:
@@ -40,7 +34,6 @@ def converter_formato_data(data_str):
         print(f"Erro ao converter data: {e}")
         return data_str
 
-# Servir imagem de evento com CORS liberado
 def imagem():
     _set_cors_headers()
     import os
@@ -61,6 +54,30 @@ def imagem():
     response.headers['Access-Control-Allow-Origin'] = '*'
     return open(caminho, 'rb').read()
 
+def upload_imagem():
+    _set_cors_headers()
+
+    if request.env.request_method == 'OPTIONS':
+        return {}
+
+    elif request.env.request_method == 'POST':
+        imagem = request.vars.get('imagem')
+
+        if imagem and hasattr(imagem, 'filename'):
+            ext = imagem.filename.split('.')[-1].lower()
+            if ext not in ['jpg', 'jpeg', 'png']:
+                response.status = 400
+                return response.json({'error': 'Formato não permitido'})
+
+            nome = db.t_eventos.f_imagem.store(imagem.file, imagem.filename)
+            return response.json({'status': 'ok', 'nome_arquivo': nome})
+        else:
+            response.status = 400
+            return response.json({'error': 'Imagem não enviada'})
+
+    else:
+        response.status = 405
+        return response.json({'error': 'Método não suportado'})
 
 def eventos():
     if request.env.request_method == 'OPTIONS':
@@ -71,34 +88,22 @@ def eventos():
         _set_cors_headers()
         data = get_request_data()
 
-        # Validar campos obrigatórios
         campos_obrigatorios = ['oque', 'quando', 'onde', 'fonte', 'local']
         for campo in campos_obrigatorios:
             if campo not in data or not data[campo]:
                 response.status = 400
-                return response.json({
-                    'error': f"Campo obrigatório ausente ou vazio: {campo}"
-                })
+                return response.json({'error': f"Campo obrigatório ausente: {campo}"})
 
         try:
             quando_convertido = converter_formato_data(data['quando'])
-            imagem_upload = data.get('imagem')
 
-            # Validação de extensão permitida (opcional)
-            if imagem_upload and hasattr(imagem_upload, 'filename'):
-                ext = imagem_upload.filename.split('.')[-1].lower()
-                if ext not in ['jpg', 'jpeg', 'png']:
-                    response.status = 400
-                    return response.json({'error': 'Formato de imagem não permitido'})
-
-            # Web2py vai gerar o nome e salvar corretamente
             evento_id = db.t_eventos.insert(
                 f_oque=data['oque'],
                 f_quando=quando_convertido,
                 f_onde=data['onde'],
                 f_fonte=data['fonte'],
                 f_local=data['local'],
-                f_imagem=imagem_upload,
+                f_imagem=data.get('imagem'),
                 f_endereco=data.get('endereco'),
                 f_preco=data.get('preco'),
                 f_descricao=data.get('descricao'),
@@ -106,10 +111,7 @@ def eventos():
             )
 
             db.commit()
-            return response.json({
-                'status': 'ok',
-                'id': evento_id
-            })
+            return response.json({'status': 'ok', 'id': evento_id})
 
         except Exception as e:
             db.rollback()
@@ -117,52 +119,36 @@ def eventos():
             tb = traceback.format_exc()
             print(tb)
             response.status = 500
-            return response.json({
-                'status': 'error',
-                'message': str(e),
-                'traceback': tb
-            })
+            return response.json({'status': 'error', 'message': str(e), 'traceback': tb})
 
     elif request.env.request_method == 'GET':
         try:
             query = (db.t_eventos.id > 0)
             eventos = db(query).select(orderby=~db.t_eventos.id)
-
-            resultado = []
-            for e in eventos:
-                resultado.append({
-                    'id': e.id,
-                    'oque': e.f_oque,
-                    'quando': e.f_quando,
-                    'onde': e.f_onde,
-                    'local': e.f_local,
-                    'fonte': e.f_fonte,
-                    'imagem': e.f_imagem,
-                    'endereco': e.f_endereco,
-                    'preco': e.f_preco,
-                    'descricao': e.f_descricao,
-                    'tipo': e.f_tipo
-                })
-
+            resultado = [{
+                'id': e.id,
+                'oque': e.f_oque,
+                'quando': e.f_quando,
+                'onde': e.f_onde,
+                'local': e.f_local,
+                'fonte': e.f_fonte,
+                'imagem': e.f_imagem,
+                'endereco': e.f_endereco,
+                'preco': e.f_preco,
+                'descricao': e.f_descricao,
+                'tipo': e.f_tipo
+            } for e in eventos]
             return response.json({'eventos': resultado})
-
         except Exception as e:
             import traceback
             tb = traceback.format_exc()
             print(tb)
             response.status = 500
-            return response.json({
-                'status': 'error',
-                'message': str(e),
-                'traceback': tb
-            })
+            return response.json({'status': 'error', 'message': str(e), 'traceback': tb})
 
     else:
         response.status = 405
         return response.json({'error': 'Método não suportado'})
 
-
-
-# Página de teste da API
 def api_teste():
     return dict(message="API de eventos está funcionando corretamente")

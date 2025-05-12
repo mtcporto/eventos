@@ -925,78 +925,115 @@
         document.body.removeChild(modalContainer);
       });
     }
-      // Enviar eventos selecionados para a API
     async function enviarEventos() {
-      const eventCards = document.querySelectorAll('.event-card');
-      const selecionados = Array.from(eventCards).filter(card => 
-        card.querySelector('input[type="checkbox"]').checked
-      );
-      if (selecionados.length === 0) {
-        alert("Nenhum evento selecionado para envio.");
-        return;
+  const eventCards = document.querySelectorAll('.event-card');
+  const selecionados = Array.from(eventCards).filter(card =>
+    card.querySelector('input[type="checkbox"]').checked
+  );
+  if (selecionados.length === 0) {
+    alert("Nenhum evento selecionado para envio.");
+    return;
+  }
+
+  const sendButton = document.getElementById('sendButton');
+  sendButton.disabled = true;
+  sendButton.textContent = 'Enviando...';
+
+  const urlUploadImagem = 'https://mtcporto.pythonanywhere.com/eventos/default/upload_imagem';
+  const urlCadastrarEvento = 'https://mtcporto.pythonanywhere.com/eventos/default/eventos';
+
+  const input = document.getElementById("imageInput");
+  const file = input.files[0];  // mesma imagem para todos
+
+  let nomeImagem = null;
+
+  // 1. Envia imagem uma vez (caso exista)
+  if (file) {
+    try {
+      const formImagem = new FormData();
+      formImagem.append('imagem', file);
+      const resImg = await fetch(urlUploadImagem, {
+        method: 'POST',
+        body: formImagem
+      });
+      const jsonImg = await resImg.json();
+      if (!resImg.ok || !jsonImg.nome_arquivo) {
+        throw new Error(jsonImg.error || "Falha ao enviar imagem");
       }
-      const sendButton = document.getElementById('sendButton');
-      sendButton.disabled = true;
-      sendButton.textContent = 'Enviando...';
-      const apiUrl = 'https://eventos.mosaicoworkers.workers.dev/';
-      let sucessos = 0;
-      let falhas = 0;
-      let mensagens = [];
-      // Pega o arquivo da imagem selecionada
-      const input = document.getElementById("imageInput");
-      const file = input.files[0];
-      for (const card of selecionados) {
-        try {
-          const atracao = card.querySelector('.event-card-title').textContent;
-          const data = card.querySelector('.event-card-date').textContent;
-          const getValueByLabel = (label) => {
-            const labelElement = Array.from(card.querySelectorAll('.event-card-item-label'))
-              .find(el => el.textContent === label);
-            return labelElement?.nextElementSibling?.textContent || '';
-          };
-          const formData = new FormData();
-          formData.append('oque', atracao);
-          formData.append('quando', data + ' ' + getValueByLabel('Horário'));
-          formData.append('onde', getValueByLabel('Cidade') || 'João Pessoa');
-          formData.append('fonte', getValueByLabel('Fonte') || 'Mini Agente de Eventos');
-          formData.append('local', getValueByLabel('Local') || 'Local não especificado');
-          const endereco = getValueByLabel('Endereço');
-          if (endereco) formData.append('endereco', endereco);
-          const preco = getValueByLabel('Preço');
-          if (preco) formData.append('preco', preco);
-          const tipo = getValueByLabel('Tipo');
-          if (tipo) formData.append('tipo', tipo);
-          const descricao = getValueByLabel('Descrição');
-          if (descricao) formData.append('descricao', descricao);
-          // Adiciona a imagem real (arquivo) se houver
-          if (file) formData.append('imagem', file);
-          const response = await fetch(apiUrl, {
-            method: 'POST',
-            body: formData
-          });
-          if (response.ok) {
-            const result = await response.json();
-            console.log("Resposta da API:", result);
-            sucessos++;
-          } else {
-            const errorText = await response.text();
-            throw new Error(`Erro na API (${response.status}): ${errorText}`);
-          }
-        } catch (error) {
-          console.error("Erro ao processar evento:", error);
-          falhas++;
-          mensagens.push(`Erro ao processar "${card.querySelector('.event-card-title').textContent}": ${error.message}`);
-        }
-      }
+      nomeImagem = jsonImg.nome_arquivo;
+    } catch (err) {
+      console.error("Erro ao enviar imagem:", err);
+      alert("Erro ao enviar imagem. Abortei o envio dos eventos.");
       sendButton.disabled = false;
       sendButton.textContent = 'Enviar para API';
-      if (sucessos > 0) {
-        alert(`${sucessos} evento(s) enviado(s) com sucesso!`);
-      }
-      if (falhas > 0) {
-        alert(`${falhas} evento(s) não pôde(puderam) ser enviado(s):\n${mensagens.join('\n')}`);
-      }
+      return;
     }
+  }
+
+  // 2. Envia dados de cada evento
+  let sucessos = 0;
+  let falhas = 0;
+  let mensagens = [];
+
+  for (const card of selecionados) {
+    try {
+      const atracao = card.querySelector('.event-card-title').textContent;
+      const data = card.querySelector('.event-card-date').textContent;
+
+      const getValueByLabel = (label) => {
+        const labelElement = Array.from(card.querySelectorAll('.event-card-item-label'))
+          .find(el => el.textContent === label);
+        return labelElement?.nextElementSibling?.textContent || '';
+      };
+
+      const eventoData = {
+        oque: atracao,
+        quando: data + ' ' + getValueByLabel('Horário'),
+        onde: getValueByLabel('Cidade') || 'João Pessoa',
+        fonte: getValueByLabel('Fonte') || 'Mini Agente de Eventos',
+        local: getValueByLabel('Local') || 'Local não especificado',
+        endereco: getValueByLabel('Endereço') || '',
+        preco: getValueByLabel('Preço') || '',
+        tipo: getValueByLabel('Tipo') || '',
+        descricao: getValueByLabel('Descrição') || '',
+        imagem: nomeImagem // nome retornado da API de upload
+      };
+
+      const res = await fetch(urlCadastrarEvento, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(eventoData)
+      });
+
+      if (res.ok) {
+        const result = await res.json();
+        console.log("Evento cadastrado:", result);
+        sucessos++;
+      } else {
+        const errorText = await res.text();
+        throw new Error(`Erro na API (${res.status}): ${errorText}`);
+      }
+
+    } catch (error) {
+      console.error("Erro ao processar evento:", error);
+      falhas++;
+      mensagens.push(`Erro em "${card.querySelector('.event-card-title').textContent}": ${error.message}`);
+    }
+  }
+
+  sendButton.disabled = false;
+  sendButton.textContent = 'Enviar para API';
+
+  if (sucessos > 0) {
+    alert(`${sucessos} evento(s) enviado(s) com sucesso!`);
+  }
+  if (falhas > 0) {
+    alert(`${falhas} evento(s) não pôde(puderam) ser enviado(s):\n${mensagens.join('\n')}`);
+  }
+}
+
   </script>
 </body>
 </html>
