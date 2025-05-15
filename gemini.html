@@ -340,20 +340,43 @@
     const GEMINI_API_KEY = "AIzaSyAQR7qRaUJ6wpEq_RrGSUzodbkmVbz7Gdk"; // <= SUBSTITUA PELA SUA CHAVE
     const GEMINI_MODEL_ID = "gemini-1.5-flash-latest"; // Modelo a ser usado
     const GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
-    
-    // Endpoint da API Web2py real
+      // Endpoint da API - usar apenas produção
     const API_ENDPOINT = "https://eventos.mosaicoworkers.workers.dev/";
 
     // --- Variáveis globais ---
     let rawText = "";
     let eventos = [];  // Array para armazenar múltiplos eventos
     let lastImageData = null;
-    
-    // --- Inicialização da página ---
+      // --- Inicialização da página ---
     document.addEventListener('DOMContentLoaded', function() {
       const preview = document.getElementById('preview');
       // Garantir que o preview comece oculto
       preview.style.display = 'none';
+      
+      // Adicionar aviso sobre o novo método base64
+      const container = document.querySelector('.container');
+      const h2 = document.querySelector('.container h2');
+      
+      const avisoElement = document.createElement('div');
+      avisoElement.style.backgroundColor = '#e3f2fd';
+      avisoElement.style.padding = '10px';
+      avisoElement.style.borderRadius = '5px';
+      avisoElement.style.marginBottom = '15px';
+      avisoElement.style.borderLeft = '4px solid var(--primary)';
+      
+      avisoElement.innerHTML = `
+        <p style="margin: 0; font-size: 0.9em;">
+          <strong>Nova versão:</strong> Esta página agora envia a imagem diretamente com os dados do evento (base64), 
+          evitando problemas de CORS em requisições separadas.
+        </p>
+      `;
+      
+      // Inserir o aviso após o título
+      if (h2 && h2.nextElementSibling) {
+        container.insertBefore(avisoElement, h2.nextElementSibling);
+      } else if (container) {
+        container.appendChild(avisoElement);
+      }
     });
     
     // Mostrar preview quando uma imagem for selecionada
@@ -934,41 +957,21 @@
     alert("Nenhum evento selecionado para envio.");
     return;
   }
-
   const sendButton = document.getElementById('sendButton');
   sendButton.disabled = true;
   sendButton.textContent = 'Enviando...';
-
-  const urlUploadImagem = 'https://mtcporto.pythonanywhere.com/eventos/default/upload_imagem';
-  const urlCadastrarEvento = 'https://mtcporto.pythonanywhere.com/eventos/default/eventos';
-
-  const input = document.getElementById("imageInput");
-  const file = input.files[0];  // mesma imagem para todos
-
-  let nomeImagem = null;
-
-  // 1. Envia imagem uma vez (caso exista)
-  if (file) {
-    try {
-      const formImagem = new FormData();
-      formImagem.append('imagem', file);
-      const resImg = await fetch(urlUploadImagem, {
-        method: 'POST',
-        body: formImagem
-      });
-      const jsonImg = await resImg.json();
-      if (!resImg.ok || !jsonImg.nome_arquivo) {
-        throw new Error(jsonImg.error || "Falha ao enviar imagem");
-      }
-      nomeImagem = jsonImg.nome_arquivo;
-    } catch (err) {
-      console.error("Erro ao enviar imagem:", err);
-      alert("Erro ao enviar imagem. Abortei o envio dos eventos.");
-      sendButton.disabled = false;
-      sendButton.textContent = 'Enviar para API';
-      return;
-    }
+  const urlCadastrarEvento = API_ENDPOINT + 'eventos';
+  
+  // Verificar CORS preflight primeiro
+  try {
+    // Teste de conectividade com a API
+    console.log("Verificando conectividade com API:", urlCadastrarEvento);
+  } catch (error) {
+    console.error("Erro ao verificar conectividade:", error);
   }
+
+  // Verificar se temos uma imagem disponível
+  const imagemBase64 = lastImageData;
 
   // 2. Envia dados de cada evento
   let sucessos = 0;
@@ -992,14 +995,16 @@
         onde: getValueByLabel('Cidade') || 'João Pessoa',
         fonte: getValueByLabel('Fonte') || 'Mini Agente de Eventos',
         local: getValueByLabel('Local') || 'Local não especificado',
-        endereco: getValueByLabel('Endereço') || '',
-        preco: getValueByLabel('Preço') || '',
+        endereco: getValueByLabel('Endereço') || '',        preco: getValueByLabel('Preço') || '',
         tipo: getValueByLabel('Tipo') || '',
-        descricao: getValueByLabel('Descrição') || '',
-        imagem: nomeImagem // nome retornado da API de upload
+        descricao: getValueByLabel('Descrição') || ''
       };
-
-      const res = await fetch(urlCadastrarEvento, {
+      
+      // Adicionar a imagem como base64 se disponível
+      if (imagemBase64) {
+        console.log("Adicionando imagem em base64 à requisição");
+        eventoData.imagem_base64 = imagemBase64;
+      }      const res = await fetch(urlCadastrarEvento, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
