@@ -39,8 +39,8 @@ export default {
                             const originalSize = jsonData.imagem_base64.length;
                             console.log('imagem_base64 presente, tamanho aprox:', Math.round(originalSize/1024) + 'KB');
                             
-                            // Se a imagem base64 for maior que 70KB, vamos otimizá-la
-                            if (originalSize > 70000) {
+                            // Se a imagem base64 for maior que 100KB, vamos otimizá-la
+                            if (originalSize > 100000) {
                                 console.log('Otimizando imagem no worker...');
                                 
                                 // Remover cabeçalho data:image... se existir
@@ -49,11 +49,11 @@ export default {
                                     imageData = imageData.split(',')[1];
                                 }
                                 
-                                // Limitar tamanho máximo para 70KB
-                                const maxSizeBytes = 70000;
+                                // Limitar tamanho máximo para 100KB
+                                const maxSizeBytes = 100000;
                                 if (imageData.length > maxSizeBytes) {
                                     jsonData.imagem_base64 = 'data:image/jpeg;base64,' + imageData.substring(0, maxSizeBytes);
-                                    console.log('Imagem truncada para ~70KB');
+                                    console.log('Imagem truncada para ~100KB');
                                 } else {
                                     jsonData.imagem_base64 = 'data:image/jpeg;base64,' + imageData;
                                 }
