@@ -358,31 +358,57 @@
         
         const img = new Image();
         img.onload = function() {
-          // Criar um canvas para redimensionar a imagem
-          const canvas = document.createElement('canvas');
-          
-          // Calcular as novas dimensões mantendo a proporção
-          let width = img.width;
-          let height = img.height;
-          
-          if (width > maxWidth) {
-            height = Math.round((height * maxWidth) / width);
-            width = maxWidth;
+          try {
+            // Criar um canvas para redimensionar a imagem
+            const canvas = document.createElement('canvas');
+            
+            // Calcular as novas dimensões mantendo a proporção
+            let width = img.width;
+            let height = img.height;
+            
+            // Se a altura for maior que a largura, usar maxWidth como limite para altura
+            if (height > width) {
+              if (height > maxWidth) {
+                width = Math.round((width * maxWidth) / height);
+                height = maxWidth;
+              }
+            } else if (width > maxWidth) {
+              height = Math.round((height * maxWidth) / width);
+              width = maxWidth;
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            // Desenhar a imagem redimensionada no canvas
+            const ctx = canvas.getContext('2d');
+            
+            // Opcionalmente aplicar mais otimizações para melhorar compressão
+            // Limpar o canvas com fundo branco para melhor compressão
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, width, height);
+            
+            // Aplicar suavização para melhorar compressão
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'low'; // 'low', 'medium', 'high'
+            
+            // Desenhar imagem
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            // Converter para base64 com JPEG (melhor compressão que PNG)
+            // Força mime type JPEG para economia de espaço
+            const newBase64 = canvas.toDataURL('image/jpeg', quality);
+            
+            // Remover cabeçalho se necessário para economizar espaço
+            const finalBase64 = newBase64.includes(',') ? newBase64 : 'data:image/jpeg;base64,' + newBase64;
+            
+            console.log(`Imagem redimensionada: ${width}x${height}, tamanho aproximado: ${Math.round(finalBase64.length/1024)}KB`);
+            
+            resolve(finalBase64);
+          } catch (e) {
+            console.error("Erro ao processar imagem no canvas:", e);
+            reject(e);
           }
-          
-          canvas.width = width;
-          canvas.height = height;
-          
-          // Desenhar a imagem redimensionada no canvas
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-          
-          // Converter de volta para base64 com qualidade reduzida
-          const newBase64 = canvas.toDataURL('image/jpeg', quality);
-          
-          console.log(`Imagem redimensionada: ${width}x${height}, tamanho aproximado: ${Math.round(newBase64.length/1024)}KB`);
-          
-          resolve(newBase64);
         };
         
         img.onerror = function() {
@@ -412,8 +438,8 @@
       
       avisoElement.innerHTML = `
         <p style="margin: 0; font-size: 0.9em;">
-          <strong>Nova versão:</strong> Esta página agora envia a imagem diretamente com os dados do evento (base64), 
-          evitando problemas de CORS em requisições separadas.
+          <strong>Nova versão:</strong> Esta página envia a imagem diretamente com os dados do evento (base64).
+          A imagem será redimensionada automaticamente para garantir compatibilidade com a API.
         </p>
       `;
       
@@ -1079,21 +1105,52 @@
       if (imagemBase64) {
         console.log("Redimensionando imagem antes do envio...");
         try {
-          // Redimensionar para máximo 600px de largura e qualidade 0.6 (60%)
-          const imagemReduzida = await resizeImage(imagemBase64, 600, 0.6);
-          console.log(`Imagem original: ~${Math.round(imagemBase64.length/1024)}KB, Imagem reduzida: ~${Math.round(imagemReduzida.length/1024)}KB`);
+          // Calcular o tamanho em KB da imagem original
+          const originalSizeKB = Math.round(imagemBase64.length/1024);
+          
+          // Ajustar tamanho máximo e qualidade baseado no tamanho da imagem
+          // Vamos ser muito mais agressivos na compressão
+          let maxWidth = 300;  // Reduz drasticamente o tamanho máximo
+          let quality = 0.4;   // Reduz a qualidade para 40%
+          
+          // Para imagens muito grandes, reduzir ainda mais
+          if (originalSizeKB > 200) {
+            maxWidth = 240;
+            quality = 0.3;
+          }
+          
+          // Para imagens extremamente grandes, ser ainda mais agressivo
+          if (originalSizeKB > 500) {
+            maxWidth = 200;  // Tamanho muito pequeno
+            quality = 0.25;  // Qualidade muito baixa
+          }
+          
+          // Redimensionar com parâmetros mais agressivos
+          const imagemReduzida = await resizeImage(imagemBase64, maxWidth, quality);
+          const reducedSizeKB = Math.round(imagemReduzida.length/1024);
+          console.log(`Imagem original: ~${originalSizeKB}KB, Imagem reduzida: ~${reducedSizeKB}KB`);
           console.log(`Redução de tamanho: ${Math.round((1 - imagemReduzida.length/imagemBase64.length) * 100)}%`);
           
-          eventoData.imagem_base64 = imagemReduzida;
+          // Se ainda for maior que 100KB, tentar reduzir mais uma vez
+          if (reducedSizeKB > 100) {
+            const imagemMaisReduzida = await resizeImage(imagemReduzida, maxWidth * 0.8, quality * 0.8);
+            const finalSizeKB = Math.round(imagemMaisReduzida.length/1024);
+            console.log(`Segunda redução: ~${finalSizeKB}KB (${Math.round((1 - imagemMaisReduzida.length/imagemReduzida.length) * 100)}% adicional)`);
+            eventoData.imagem_base64 = imagemMaisReduzida;
+          } else {
+            eventoData.imagem_base64 = imagemReduzida;
+          }
+          
           console.log("Imagem redimensionada adicionada à requisição");
         } catch (err) {
           console.error("Erro ao redimensionar imagem:", err);
-          // Usar a imagem original apenas se falhar o redimensionamento e for pequena o suficiente
-          if (imagemBase64.length < 200000) {
+          // Usar apenas um pedaço da imagem original se for muito grande
+          if (imagemBase64.length > 200000) {
+            console.log("Imagem muito grande, enviando sem imagem");
+            // Não incluir imagem grande demais
+          } else {
             eventoData.imagem_base64 = imagemBase64;
             console.log("Usando imagem original (menor que 200KB)");
-          } else {
-            console.log("Imagem muito grande. Enviando sem imagem.");
           }
         }
       }

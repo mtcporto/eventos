@@ -22,20 +22,51 @@ export default {
             // Clone e processe o corpo
             let body;
             try {
+                // Essencial: vamos otimizar o conteúdo antes de enviar para o backend
                 if (contentType.includes('application/json')) {
-                    // Se for JSON, vamos analisar e apenas logar informações importantes
-                    const jsonData = await request.clone().json();
-                    // Vamos logar todos os campos exceto a imagem base64 para evitar estouro do limite de logs
-                    const keysToLog = Object.keys(jsonData).filter(k => k !== 'imagem_base64');
-                    const logSafeData = {};
-                    keysToLog.forEach(k => logSafeData[k] = jsonData[k]);
-                    
-                    console.log('Dados do evento:', JSON.stringify(logSafeData));
-                    if (jsonData.imagem_base64) {
-                        console.log('imagem_base64 presente, tamanho aprox:', Math.round(jsonData.imagem_base64.length/1024) + 'KB');
+                    try {
+                        // Se for JSON, primeiro vamos otimizar os dados
+                        const jsonData = await request.clone().json();
+                        
+                        // Log seguro (sem imagem base64)
+                        const keysToLog = Object.keys(jsonData).filter(k => k !== 'imagem_base64');
+                        const logSafeData = {};
+                        keysToLog.forEach(k => logSafeData[k] = jsonData[k]);
+                        console.log('Dados do evento:', JSON.stringify(logSafeData));
+                        
+                        // Verificar se a imagem é muito grande e redimensionar se necessário
+                        if (jsonData.imagem_base64) {
+                            const originalSize = jsonData.imagem_base64.length;
+                            console.log('imagem_base64 presente, tamanho aprox:', Math.round(originalSize/1024) + 'KB');
+                            
+                            // Se a imagem base64 for maior que 70KB, vamos otimizá-la
+                            if (originalSize > 70000) {
+                                console.log('Otimizando imagem no worker...');
+                                
+                                // Remover cabeçalho data:image... se existir
+                                let imageData = jsonData.imagem_base64;
+                                if (imageData.includes(',')) {
+                                    imageData = imageData.split(',')[1];
+                                }
+                                
+                                // Limitar tamanho máximo para 70KB
+                                const maxSizeBytes = 70000;
+                                if (imageData.length > maxSizeBytes) {
+                                    jsonData.imagem_base64 = 'data:image/jpeg;base64,' + imageData.substring(0, maxSizeBytes);
+                                    console.log('Imagem truncada para ~70KB');
+                                } else {
+                                    jsonData.imagem_base64 = 'data:image/jpeg;base64,' + imageData;
+                                }
+                            }
+                        }
+                        
+                        // Usar a versão otimizada do body
+                        body = JSON.stringify(jsonData);
+                        console.log('Corpo JSON processado, tamanho final:', Math.round(body.length/1024) + 'KB');
+                    } catch (jsonError) {
+                        console.error('Erro ao processar JSON:', jsonError);
+                        body = await request.clone().text();
                     }
-                    
-                    body = await request.clone().text();
                 } else {
                     body = await request.clone().text();
                     console.log('Forwarding request body length:', body.length);
@@ -47,6 +78,39 @@ export default {
                 body = await request.clone().text();
             }
 
+            // Verificar se o corpo é muito grande (mais de 1MB)
+            if (body && body.length > 1000000) {
+                console.log('Requisição muito grande, enviando versão compacta');
+                
+                // Se for JSON, tentar extrair apenas os dados essenciais
+                try {
+                    const jsonData = JSON.parse(body);
+                    
+                    // Se tiver a imagem base64, verificar e reduzir ainda mais se necessário
+                    if (jsonData.imagem_base64 && jsonData.imagem_base64.length > 100000) {
+                        console.log('Imagem base64 ainda muito grande, reduzindo mais');
+                        // Remover o prefixo data:image se existir
+                        let imageData = jsonData.imagem_base64;
+                        if (imageData.includes(',')) {
+                            imageData = imageData.split(',')[1];
+                        }
+                        
+                        // Limitar o tamanho da imagem para evitar problemas
+                        if (imageData.length > 100000) {
+                            jsonData.imagem_base64 = imageData.substring(0, 100000);
+                            console.log('Imagem truncada para 100KB');
+                        }
+                    }
+                    
+                    // Usar a versão otimizada
+                    body = JSON.stringify(jsonData);
+                    console.log('JSON reempacotado, novo tamanho:', body.length);
+                } catch (e) {
+                    console.error('Erro ao reprocessar JSON:', e);
+                    // Continuar com o body original
+                }
+            }
+            
             console.log('Enviando requisição para:', targetUrl);
             const response = await fetch(targetUrl, {
                 method: request.method,

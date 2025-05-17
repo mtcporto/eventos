@@ -26,27 +26,66 @@ def _set_cors_headers():
 
 # Get request data from JSON or POST vars
 def get_request_data():
+    # Log para fins de diagnóstico
+    print("Processando requisição de dados")
+    print(f"Content-Type: {request.env.http_content_type}")
+    print(f"Content-Length: {request.env.http_content_length}")
+    
+    # Primeiro, tentar obter diretamente do request.json
     try:
-        # Try to get data from request.json
         data = request.json
         if data:
+            print("Dados JSON obtidos diretamente")
             return data
     except Exception as e:
-        print(f"Erro ao decodificar JSON: {str(e)}")
-        
+        print(f"Erro ao decodificar JSON diretamente: {str(e)}")
+    
+    # Segunda tentativa: ler o corpo bruto e decodificar
     try:
-        # If JSON parsing fails, try to read the raw body and parse it manually
         import json
-        body = request.body.read().decode('utf-8')
-        if body:
-            print(f"Tentando decodificar manualmente: {body[:200]}")
-            data = json.loads(body)
-            return data
-    except Exception as e:
-        print(f"Erro ao decodificar manualmente: {str(e)}")
+        request.body.seek(0) # Garantir que estamos lendo desde o início
+        body = request.body.read()
         
-    # Finally, fall back to form vars or empty dict
-    return request.vars or {}
+        # Detectar se é texto ou binário
+        try:
+            # Tentar decodificar como utf-8
+            text_body = body.decode('utf-8')
+            print(f"Comprimento do corpo: {len(text_body)}")
+            if text_body:
+                print(f"Amostra do corpo: {text_body[:200]}")
+                
+                # Verificar se parece JSON
+                if text_body.strip().startswith('{') or text_body.strip().startswith('['):
+                    try:
+                        data = json.loads(text_body)
+                        print("JSON decodificado manualmente com sucesso")
+                        return data
+                    except json.JSONDecodeError as je:
+                        print(f"Erro ao decodificar JSON manual: {je}")
+                        # Tentar recuperação parcial do JSON
+                        try:
+                            # Remover caracteres problemáticos e tentar novamente
+                            clean_text = text_body.replace('\n', '').replace('\r', '')
+                            data = json.loads(clean_text)
+                            print("JSON recuperado após limpeza")
+                            return data
+                        except:
+                            print("Recuperação de JSON falhou")
+                else:
+                    print("O corpo não parece ser JSON")
+        except UnicodeDecodeError:
+            print("O corpo não é texto UTF-8 decodificável")
+    except Exception as e:
+        print(f"Erro ao processar corpo da requisição: {str(e)}")
+    
+    # Terceira tentativa: verificar variáveis POST
+    if request.vars:
+        print("Usando variáveis da requisição")
+        return request.vars
+    
+    # Se chegamos aqui, não conseguimos obter dados
+    print("ALERTA: Nenhum dado pôde ser extraído da requisição")
+    return {}
 
 # Handle OPTIONS request for CORS preflight
 def options():
