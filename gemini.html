@@ -966,6 +966,16 @@
   try {
     // Teste de conectividade com a API
     console.log("Verificando conectividade com API:", urlCadastrarEvento);
+    
+    // Fazer um fetch OPTIONS para testar conectividade
+    await fetch(urlCadastrarEvento, {
+      method: 'OPTIONS',
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+    
+    console.log("Conectividade OK - CORS preflight passou");
   } catch (error) {
     console.error("Erro ao verificar conectividade:", error);
   }
@@ -1004,10 +1014,15 @@
       if (imagemBase64) {
         console.log("Adicionando imagem em base64 à requisição");
         eventoData.imagem_base64 = imagemBase64;
-      }      const res = await fetch(urlCadastrarEvento, {
+      }
+      
+      console.log("Enviando dados para API:", JSON.stringify(eventoData));
+      
+      const res = await fetch(urlCadastrarEvento, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
         body: JSON.stringify(eventoData)
       });

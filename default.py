@@ -27,9 +27,26 @@ def _set_cors_headers():
 # Get request data from JSON or POST vars
 def get_request_data():
     try:
-        return request.json
-    except:
-        return request.vars or {}
+        # Try to get data from request.json
+        data = request.json
+        if data:
+            return data
+    except Exception as e:
+        print(f"Erro ao decodificar JSON: {str(e)}")
+        
+    try:
+        # If JSON parsing fails, try to read the raw body and parse it manually
+        import json
+        body = request.body.read().decode('utf-8')
+        if body:
+            print(f"Tentando decodificar manualmente: {body[:200]}")
+            data = json.loads(body)
+            return data
+    except Exception as e:
+        print(f"Erro ao decodificar manualmente: {str(e)}")
+        
+    # Finally, fall back to form vars or empty dict
+    return request.vars or {}
 
 # Handle OPTIONS request for CORS preflight
 def options():

@@ -15,12 +15,18 @@ export default {
         }
 
         const body = await request.clone().text();
-        console.log('Forwarding request body:', body);
+        console.log('Forwarding request body length:', body.length);
+        // Log first 200 characters to avoid overwhelming logs
+        console.log('Forwarding request sample:', body.substring(0, 200) + (body.length > 200 ? '...' : ''));
+
+        const contentType = request.headers.get('Content-Type') || 'application/json';
+        console.log('Content-Type:', contentType);
 
         const response = await fetch(targetUrl, {
             method: request.method,
             headers: {
-                'Content-Type': request.headers.get('Content-Type') || 'application/json',
+                'Content-Type': contentType,
+                'Accept': 'application/json',
                 'Authorization': request.headers.get('Authorization') || ''
             },
             body: body,
