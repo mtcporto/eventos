@@ -636,7 +636,7 @@
           
           // Definir uma imagem padrão se nenhuma for fornecida
           const imageUrl = evento.imagem 
-            ? evento.imagem 
+            ? `https://mtcporto.pythonanywhere.com/eventos/default/imagem/${evento.imagem}` 
             : 'https://via.placeholder.com/300x200?text=Sem+Imagem';
           
           // Criar o conteúdo do card
