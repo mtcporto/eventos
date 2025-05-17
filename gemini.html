@@ -635,8 +635,18 @@
             
             // Tratar o formato da data
             if (evento.data) {
+              // Se a data contém "DD" ou "MM", significa que o modelo não conseguiu detectar a data correta
+              if (evento.data.includes('DD') || evento.data.includes('MM')) {
+                // Substituir pela data atual
+                const hoje = new Date();
+                const dia = hoje.getDate().toString().padStart(2, '0');
+                const mes = (hoje.getMonth() + 1).toString().padStart(2, '0');
+                const ano = '2025'; // Manter no padrão de eventos no futuro
+                evento.data = `${dia}/${mes}/${ano}`;
+                console.log("Data genérica substituída pela data de hoje (ano 2025):", evento.data);
+              }
               // Se contiver AAAA, substitua pelo ano 2025
-              if (evento.data.includes('AAAA')) {
+              else if (evento.data.includes('AAAA')) {
                 evento.data = evento.data.replace('AAAA', '2025');
               }
               // Se não tiver ano (formato DD/MM), adicione 2025
@@ -651,12 +661,20 @@
               const partes = evento.data.split('/');
               if (partes.length === 3) {
                 // Se o ano não for explicitamente 2025 ou maior, corrige para 2025
-                const ano = parseInt(partes[2]);
-                if (ano < 2025) {
+                const ano = parseInt(partes[2], 10);
+                if (isNaN(ano) || ano < 2025) {
                   partes[2] = '2025';
                   evento.data = partes.join('/');
                 }
               }
+            } else {
+              // Se não houver data, usar a data atual
+              const hoje = new Date();
+              const dia = hoje.getDate().toString().padStart(2, '0');
+              const mes = (hoje.getMonth() + 1).toString().padStart(2, '0');
+              evento.data = `${dia}/${mes}/2025`;
+              console.log("Data inexistente substituída pela data de hoje (ano 2025):", evento.data);
+            }
             }
             
             return evento;
@@ -1089,9 +1107,29 @@
         throw new Error('Dados obrigatórios faltando (título ou data)');
       }
 
+      // Verificar e tratar o formato da data
+      let dataFormatada = data;
+      // Verificar se a data tem DD ou MM (formato não reconhecido)
+      if (dataFormatada.includes('DD') || dataFormatada.includes('MM')) {
+        // Usar a data atual
+        const hoje = new Date();
+        const dia = hoje.getDate().toString().padStart(2, '0');
+        const mes = (hoje.getMonth() + 1).toString().padStart(2, '0');
+        dataFormatada = `${dia}/${mes}/2025`;
+        console.log("Data substituída no momento do envio:", dataFormatada);
+      }
+      
+      // Verificar e formatar horário
+      let horario = getValueByLabel('Horário') || '19:00';
+      // Garantir que está no formato HH:MM
+      if (!/^\d{1,2}:\d{2}$/.test(horario)) {
+        horario = '19:00';
+        console.log("Horário mal formatado, usando padrão:", horario);
+      }
+      
       const eventoData = {
         oque: atracao,
-        quando: data + ' ' + getValueByLabel('Horário'),
+        quando: dataFormatada + ' ' + horario,
         onde: getValueByLabel('Cidade') || 'João Pessoa',
         fonte: getValueByLabel('Fonte') || 'Mini Agente de Eventos',
         local: getValueByLabel('Local') || 'Local não especificado',
@@ -1152,6 +1190,23 @@
             eventoData.imagem_base64 = imagemBase64;
             console.log("Usando imagem original (menor que 200KB)");
           }
+        }
+      }
+      
+      // Verificar se a data está realmente no formato DD/MM/YYYY
+      const dataPartes = eventoData.quando.split(' ')[0].split('/');
+      if (dataPartes.length === 3) {
+        const dia = parseInt(dataPartes[0], 10);
+        const mes = parseInt(dataPartes[1], 10);
+        const ano = parseInt(dataPartes[2], 10);
+        
+        if (isNaN(dia) || isNaN(mes) || isNaN(ano) || dia < 1 || dia > 31 || mes < 1 || mes > 12) {
+          // Data inválida, substituir pela data atual
+          const hoje = new Date();
+          const diaAtual = hoje.getDate().toString().padStart(2, '0');
+          const mesAtual = (hoje.getMonth() + 1).toString().padStart(2, '0');
+          eventoData.quando = `${diaAtual}/${mesAtual}/2025 ${eventoData.quando.split(' ')[1] || '19:00'}`;
+          console.log("Data inválida corrigida para:", eventoData.quando);
         }
       }
       

@@ -112,16 +112,24 @@ export default {
             }
             
             console.log('Enviando requisição para:', targetUrl);
-            const response = await fetch(targetUrl, {
+            
+            // Verificar se é GET ou HEAD - esses métodos não podem ter corpo
+            const requestOptions = {
                 method: request.method,
                 headers: {
                     'Content-Type': contentType,
                     'Accept': 'application/json',
                     'Authorization': request.headers.get('Authorization') || ''
                 },
-                body: body,
                 redirect: 'follow'
-            });
+            };
+            
+            // Adicionar o corpo apenas se NÃO for GET ou HEAD
+            if (request.method !== 'GET' && request.method !== 'HEAD') {
+                requestOptions.body = body;
+            }
+            
+            const response = await fetch(targetUrl, requestOptions);
 
             // Tentar processar a resposta
             const responseBody = await response.text();
