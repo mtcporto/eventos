@@ -85,6 +85,47 @@
       background-color: #eee;
     }
     
+    .card-img-loading-placeholder {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 180px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background-color: #f0f0f0;
+      z-index: 1;
+    }
+    
+    .card-img-top-container {
+      position: relative;
+      height: 180px;
+      overflow: hidden;
+    }
+    
+    .img-error {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      color: #999;
+      font-size: 2rem;
+    }
+    
+    .past-badge {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background-color: rgba(153, 153, 153, 0.8);
+      color: white;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      z-index: 2;
+    }
+    
     .card-img-placeholder {
       height: 180px;
       display: flex;
@@ -244,8 +285,12 @@
     }
     
     .footer p {
-      margin-bottom: 0;
+      margin-bottom: 10px;
       opacity: 0.8;
+    }
+    
+    .footer-actions {
+      margin-bottom: 15px;
     }
     
     .footer a {
@@ -357,7 +402,7 @@
       <i class="fas fa-calendar-times"></i>
       <h3>Nenhum evento encontrado</h3>
       <p>Tente mudar os filtros ou volte mais tarde para conferir novidades.</p>
-      <button class="btn btn-primary" onclick="carregarEventos(true)">
+      <button class="btn btn-primary" onclick="fetchEventos(true)">
         <i class="fas fa-sync-alt"></i> Atualizar
       </button>
     </div>
@@ -496,6 +541,14 @@
   <footer class="footer">
     <div class="container">
       <p>Mini Agente de Eventos &copy; <span id="current-year">2025</span></p>
+      <div class="footer-actions">
+        <button id="clearCacheBtn" class="btn btn-sm btn-outline-light me-2">
+          <i class="fas fa-trash-alt"></i> Limpar Cache
+        </button>
+        <button id="refreshBtn" class="btn btn-sm btn-outline-light">
+          <i class="fas fa-sync-alt"></i> Atualizar Dados
+        </button>
+      </div>
       <button id="btnAddEvent" class="btn btn-primary position-fixed" style="bottom: 20px; right: 20px; border-radius: 50%; width: 60px; height: 60px; box-shadow: 0 4px 10px rgba(0,0,0,0.2);">
         <i class="fas fa-plus"></i>
       </button>
@@ -534,12 +587,30 @@
       // Inicializar variáveis
       let eventos = [];
       let currentFilter = 'todos';
+      let imageCache = new Map(); // Cache para armazenar imagens já carregadas
+      const CACHE_DURATION = 30 * 60 * 1000; // 30 minutos em milissegundos
       
       // Obter eventos do servidor com o endpoint correto
-      window.fetchEventos = function() {
+      window.fetchEventos = function(forceRefresh = false) {
         // Mostrar o estado de carregamento
         document.getElementById('loading').style.display = 'block';
         
+        // Verificar se há dados em cache e se não é uma atualização forçada
+        const cachedData = localStorage.getItem('eventos_cache');
+        const cachedTimestamp = localStorage.getItem('eventos_cache_timestamp');
+        const currentTime = new Date().getTime();
+        
+        if (!forceRefresh && cachedData && cachedTimestamp && 
+            (currentTime - parseInt(cachedTimestamp) < CACHE_DURATION)) {
+          // Usar dados do cache
+          console.log("Usando dados em cache (menos de 30 minutos)");
+          eventos = JSON.parse(cachedData);
+          document.getElementById('loading').style.display = 'none';
+          displayEventos(eventos);
+          return;
+        }
+        
+        // Se chegou aqui, buscar dados novos
         // Corrigido o endpoint para o correto na API externa
         fetch('https://mtcporto.pythonanywhere.com/eventos/default/eventos')
           .then(response => {
@@ -551,6 +622,11 @@
           .then(data => {
             // A API retorna um objeto com propriedade "eventos"
             eventos = data.eventos || [];
+            
+            // Salvar dados no cache
+            localStorage.setItem('eventos_cache', JSON.stringify(eventos));
+            localStorage.setItem('eventos_cache_timestamp', currentTime.toString());
+            
             if (eventos.length === 0) {
               document.getElementById('no-events').style.display = 'block';
             } else {
@@ -580,6 +656,29 @@
               container.insertBefore(alertDiv, tabs);
             }
           });
+      }
+      
+      // Função para pré-carregar imagens
+      function preloadImage(url) {
+        return new Promise((resolve, reject) => {
+          // Se a imagem já está em cache, retornar imediatamente
+          if (imageCache.has(url)) {
+            resolve(url);
+            return;
+          }
+          
+          const img = new Image();
+          img.onload = () => {
+            // Adicionar ao cache e resolver
+            imageCache.set(url, true);
+            resolve(url);
+          };
+          img.onerror = () => {
+            // Em caso de erro, resolver com null
+            reject(null);
+          };
+          img.src = url;
+        });
       }
       
       // Função para exibir os eventos no DOM
@@ -637,11 +736,17 @@
           // Construir a URL da imagem - sempre assumimos que há uma imagem
           const imageUrl = `https://mtcporto.pythonanywhere.com/eventos/default/imagem/${evento.imagem}`;
           
-          // Criar o conteúdo do card
+          // Criar o conteúdo do card com placeholder para imagem
           card.innerHTML = `
             <div class="card h-100 ${statusClass}">
               <div class="card-img-top-container">
-                <img src="${imageUrl}" class="card-img-top" alt="${evento.oque}">
+                <div class="card-img-loading-placeholder">
+                  <div class="spinner-border spinner-border-sm" role="status">
+                    <span class="visually-hidden">Carregando...</span>
+                  </div>
+                </div>
+                <img src="data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==" 
+                  data-src="${imageUrl}" class="card-img-top" alt="${evento.oque}" loading="lazy">
                 ${isPast ? '<div class="past-badge">Evento Passado</div>' : ''}
               </div>
               <div class="card-body">
@@ -670,6 +775,26 @@
           `;
           
           container.appendChild(card);
+          
+          // Carregar a imagem com lazy loading
+          const imgElement = card.querySelector('img.card-img-top');
+          const loadingPlaceholder = card.querySelector('.card-img-loading-placeholder');
+          
+          // Iniciar carregamento da imagem
+          preloadImage(imageUrl)
+            .then(() => {
+              // Quando a imagem carregar, exibi-la e remover o placeholder
+              imgElement.src = imageUrl;
+              imgElement.onload = () => {
+                if (loadingPlaceholder) {
+                  loadingPlaceholder.style.display = 'none';
+                }
+              };
+            })
+            .catch(() => {
+              // Em caso de erro, mostrar placeholder de erro
+              loadingPlaceholder.innerHTML = '<div class="img-error"><i class="fas fa-image"></i></div>';
+            });
         });
         
         // Adicionar event listeners aos botões de edição
@@ -775,7 +900,7 @@
       });
       
       // Editar evento existente
-      function editEvent(id) {
+      function editEvento(id) {
         const evento = eventos.find(e => e.id == id);
         if (!evento) return;
         
@@ -928,6 +1053,19 @@
       
       // Buscar eventos ao carregar a página
       fetchEventos();
+      
+      // Adicionar event listeners para os botões do rodapé
+      document.getElementById('clearCacheBtn').addEventListener('click', function() {
+        localStorage.removeItem('eventos_cache');
+        localStorage.removeItem('eventos_cache_timestamp');
+        imageCache.clear();
+        alert('Cache limpo com sucesso!');
+        fetchEventos(true);
+      });
+      
+      document.getElementById('refreshBtn').addEventListener('click', function() {
+        fetchEventos(true);
+      });
     });
   </script>
 </body>
