@@ -634,10 +634,8 @@
           // Definir classe com base no status do evento
           let statusClass = isPast ? 'past-event' : 'upcoming-event';
           
-          // Definir uma imagem padrão se nenhuma for fornecida
-          const imageUrl = evento.imagem 
-            ? `https://mtcporto.pythonanywhere.com/eventos/default/imagem/${evento.imagem}` 
-            : 'https://via.placeholder.com/300x200?text=Sem+Imagem';
+          // Construir a URL da imagem - sempre assumimos que há uma imagem
+          const imageUrl = `https://mtcporto.pythonanywhere.com/eventos/default/imagem/${evento.imagem}`;
           
           // Criar o conteúdo do card
           card.innerHTML = `

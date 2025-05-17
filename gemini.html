@@ -388,9 +388,9 @@
             ctx.fillStyle = '#FFFFFF';
             ctx.fillRect(0, 0, width, height);
             
-            // Aplicar suavização com qualidade média para equilíbrio entre compressão e nitidez
+            // Aplicar suavização com qualidade alta para melhor nitidez
             ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'medium'; // 'low', 'medium', 'high'
+            ctx.imageSmoothingQuality = 'high'; // 'low', 'medium', 'high'
             
             // Desenhar imagem
             ctx.drawImage(img, 0, 0, width, height);
@@ -1109,20 +1109,20 @@
           const originalSizeKB = Math.round(imagemBase64.length/1024);
           
           // Ajustar tamanho máximo e qualidade baseado no tamanho da imagem
-          // Encontrar equilíbrio entre tamanho e qualidade
-          let maxWidth = 500;  // Tamanho moderado para garantir boa qualidade
-          let quality = 0.7;   // Qualidade de 70% para preservar detalhes
+          // Garantir boa qualidade visual mantendo tamanho razoável
+          let maxWidth = 640;  // Tamanho mais generoso para melhor qualidade
+          let quality = 0.8;   // Qualidade de 80% para preservar detalhes
           
-          // Para imagens muito grandes, reduzir um pouco mais
+          // Para imagens muito grandes, reduzir um pouco
           if (originalSizeKB > 200) {
-            maxWidth = 400;
-            quality = 0.6;
+            maxWidth = 540;
+            quality = 0.75;
           }
           
-          // Para imagens extremamente grandes, reduzir mais, mas mantendo qualidade aceitável
+          // Para imagens extremamente grandes, reduzir mais, mas mantendo qualidade boa
           if (originalSizeKB > 500) {
-            maxWidth = 350;  // Tamanho razoável
-            quality = 0.5;   // Qualidade média
+            maxWidth = 480;    // Ainda mantém boa resolução
+            quality = 0.65;    // Qualidade acima da média
           }
           
           // Redimensionar com parâmetros mais agressivos
@@ -1131,9 +1131,9 @@
           console.log(`Imagem original: ~${originalSizeKB}KB, Imagem reduzida: ~${reducedSizeKB}KB`);
           console.log(`Redução de tamanho: ${Math.round((1 - imagemReduzida.length/imagemBase64.length) * 100)}%`);
           
-          // Se ainda for maior que 150KB, tentar reduzir um pouco mais, mas preservando qualidade
-          if (reducedSizeKB > 150) {
-            const imagemMaisReduzida = await resizeImage(imagemReduzida, maxWidth * 0.9, quality * 0.9);
+          // Se ainda for maior que 180KB, tentar reduzir um pouco mais, mas preservando qualidade
+          if (reducedSizeKB > 180) {
+            const imagemMaisReduzida = await resizeImage(imagemReduzida, maxWidth * 0.95, quality * 0.95);
             const finalSizeKB = Math.round(imagemMaisReduzida.length/1024);
             console.log(`Segunda redução: ~${finalSizeKB}KB (${Math.round((1 - imagemMaisReduzida.length/imagemReduzida.length) * 100)}% adicional)`);
             eventoData.imagem_base64 = imagemMaisReduzida;
