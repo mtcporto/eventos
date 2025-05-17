@@ -408,37 +408,7 @@
     </div>
   </div>
   
-  <!-- Main content -->
-  <div class="container mt-4">
-    <div class="row mb-4">
-      <div class="col-md-6">
-        <h1>Eventos</h1>
-      </div>
-      <div class="col-md-6 text-end">
-        <button id="btnAddEvent" class="btn btn-primary">
-          <i class="fas fa-plus"></i> Novo Evento
-        </button>
-      </div>
-    </div>
-    
-    <!-- Filtros -->
-    <div class="row mb-4">
-      <div class="col-12">
-        <div class="btn-group" role="group" aria-label="Filtros de eventos">
-          <button type="button" class="btn btn-outline-primary filter-btn active" data-filter="todos">Todos</button>
-          <button type="button" class="btn btn-outline-primary filter-btn" data-filter="show">Shows</button>
-          <button type="button" class="btn btn-outline-primary filter-btn" data-filter="teatro">Teatro</button>
-          <button type="button" class="btn btn-outline-primary filter-btn" data-filter="exposicao">Exposição</button>
-          <button type="button" class="btn btn-outline-primary filter-btn" data-filter="workshop">Workshop</button>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Lista de eventos -->
-    <div id="eventos-container" class="row">
-      <!-- Os eventos serão carregados dinamicamente aqui -->
-    </div>
-  </div>
+  <!-- Fim do conteúdo principal -->
   
   <!-- Modal para adicionar/editar evento -->
   <div class="modal fade" id="eventModal" tabindex="-1" aria-labelledby="eventModalLabel" aria-hidden="true">
@@ -576,6 +546,11 @@
       
       // Show the selected container
       document.getElementById(tabName + '-container').style.display = 'block';
+      
+      // Apply filtering based on the selected tab
+      if (window.aplicarFiltros) {
+        window.aplicarFiltros(tabName);
+      }
     }
   </script>
   
@@ -589,6 +564,7 @@
       let currentFilter = 'todos';
       let imageCache = new Map(); // Cache para armazenar imagens já carregadas
       const CACHE_DURATION = 30 * 60 * 1000; // 30 minutos em milissegundos
+      let currentTab = 'upcoming'; // Tab ativa por padrão
       
       // Obter eventos do servidor com o endpoint correto
       window.fetchEventos = function(forceRefresh = false) {
@@ -606,7 +582,7 @@
           console.log("Usando dados em cache (menos de 30 minutos)");
           eventos = JSON.parse(cachedData);
           document.getElementById('loading').style.display = 'none';
-          displayEventos(eventos);
+          processEvents(eventos);
           return;
         }
         
@@ -631,7 +607,7 @@
               document.getElementById('no-events').style.display = 'block';
             } else {
               document.getElementById('no-events').style.display = 'none';
-              displayEventos(eventos);
+              processEvents(eventos);
             }
             document.getElementById('loading').style.display = 'none';
           })
@@ -658,6 +634,46 @@
           });
       }
       
+      // Processar eventos e preencher os filtros dropdown
+      function processEvents(events) {
+        // Coletar todos os locais e fontes únicos
+        const locais = new Set();
+        const fontes = new Set();
+        
+        events.forEach(evento => {
+          if (evento.local) locais.add(evento.local);
+          if (evento.fonte) fontes.add(evento.fonte);
+        });
+        
+        // Preencher o dropdown de locais
+        const localSelect = document.getElementById('filterLocal');
+        localSelect.innerHTML = '<option value="">Todos os locais</option>';
+        
+        Array.from(locais).sort().forEach(local => {
+          const option = document.createElement('option');
+          option.value = local;
+          option.textContent = local;
+          localSelect.appendChild(option);
+        });
+        
+        // Preencher o dropdown de fontes
+        const fonteSelect = document.getElementById('filterFonte');
+        fonteSelect.innerHTML = '<option value="">Todas as fontes</option>';
+        
+        Array.from(fontes).sort().forEach(fonte => {
+          const option = document.createElement('option');
+          option.value = fonte;
+          option.textContent = fonte;
+          fonteSelect.appendChild(option);
+        });
+        
+        // Aplicar filtros iniciais
+        aplicarFiltros();
+        
+        // Exibir também na listagem antiga por compatibilidade
+        displayEventos(events);
+      }
+      
       // Função para pré-carregar imagens
       function preloadImage(url) {
         return new Promise((resolve, reject) => {
@@ -681,36 +697,248 @@
         });
       }
       
-      // Função para exibir os eventos no DOM
+      // Função para aplicar filtros aos eventos
+      window.aplicarFiltros = function(tab) {
+        // Se uma tab específica foi passada, atualizar a tab atual
+        if (tab) {
+          currentTab = tab;
+        }
+        
+        // Obter valores dos filtros
+        const localFilter = document.getElementById('filterLocal').value;
+        const fonteFilter = document.getElementById('filterFonte').value;
+        const searchQuery = document.getElementById('searchQuery').value.toLowerCase();
+        
+        // Aplicar filtros
+        let filteredEvents = eventos.filter(evento => {
+          // Filtro de pesquisa
+          const matchesSearch = !searchQuery || 
+            evento.oque.toLowerCase().includes(searchQuery) || 
+            (evento.local && evento.local.toLowerCase().includes(searchQuery)) || 
+            (evento.onde && evento.onde.toLowerCase().includes(searchQuery));
+            
+          // Filtro de local
+          const matchesLocal = !localFilter || evento.local === localFilter;
+          
+          // Filtro de fonte
+          const matchesFonte = !fonteFilter || evento.fonte === fonteFilter;
+          
+          return matchesSearch && matchesLocal && matchesFonte;
+        });
+        
+        // Limpar os containers de eventos
+        document.getElementById('today-events').innerHTML = '';
+        document.getElementById('tomorrow-events').innerHTML = '';
+        document.getElementById('weekend-events').innerHTML = '';
+        document.getElementById('upcoming-events').innerHTML = '';
+        document.getElementById('past-events').innerHTML = '';
+        
+        // Mostrar mensagem se não houver eventos
+        if (filteredEvents.length === 0) {
+          document.getElementById('no-events').style.display = 'block';
+          return;
+        }
+        
+        // Esconder mensagem de nenhum evento encontrado
+        document.getElementById('no-events').style.display = 'none';
+        
+        // Dados para classificar eventos
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        
+        const dayAfterTomorrow = new Date(today);
+        dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+        
+        const nextMonday = new Date(today);
+        nextMonday.setDate(nextMonday.getDate() + (8 - nextMonday.getDay()) % 7);
+        
+        // Classificar eventos por categorias de data
+        const todayEvents = [];
+        const tomorrowEvents = [];
+        const weekendEvents = [];
+        const upcomingEvents = [];
+        const pastEvents = [];
+        
+        filteredEvents.forEach(evento => {
+          const eventDate = parseDateString(evento.quando);
+          const eventDateOnly = new Date(eventDate);
+          eventDateOnly.setHours(0, 0, 0, 0);
+          
+          // Verificar se é hoje
+          if (eventDateOnly.getTime() === today.getTime()) {
+            todayEvents.push(evento);
+          }
+          
+          // Verificar se é amanhã
+          if (eventDateOnly.getTime() === tomorrow.getTime()) {
+            tomorrowEvents.push(evento);
+          }
+          
+          // Verificar se é fim de semana (próximo sábado e domingo)
+          const dayOfWeek = eventDateOnly.getDay(); // 0 (domingo) a 6 (sábado)
+          
+          if ((dayOfWeek === 0 || dayOfWeek === 6) && // É sábado ou domingo
+              eventDateOnly >= today && // É hoje ou futuro
+              eventDateOnly < nextMonday) { // É antes da próxima segunda
+            weekendEvents.push(evento);
+          }
+          
+          // Verificar se é próximo (futuro)
+          if (eventDateOnly >= today) {
+            upcomingEvents.push(evento);
+          } else {
+            // É passado
+            pastEvents.push(evento);
+          }
+        });
+        
+        // Ordenar eventos por data
+        const sortByDate = (a, b) => {
+          const dataA = parseDateString(a.quando);
+          const dataB = parseDateString(b.quando);
+          return dataA - dataB;
+        };
+        
+        todayEvents.sort(sortByDate);
+        tomorrowEvents.sort(sortByDate);
+        weekendEvents.sort(sortByDate);
+        upcomingEvents.sort(sortByDate);
+        // Eventos passados ordenados do mais recente para o mais antigo
+        pastEvents.sort((a, b) => {
+          const dataA = parseDateString(a.quando);
+          const dataB = parseDateString(b.quando);
+          return dataB - dataA;
+        });
+        
+        // Exibir contadores nos títulos das abas
+        document.querySelector('.tab[onclick*="today"]').textContent = `Hoje ${todayEvents.length ? '(' + todayEvents.length + ')' : ''}`;
+        document.querySelector('.tab[onclick*="weekend"]').textContent = `Fim de Semana ${weekendEvents.length ? '(' + weekendEvents.length + ')' : ''}`;
+        document.querySelector('.tab[onclick*="upcoming"]').textContent = `Próximos Eventos ${upcomingEvents.length ? '(' + upcomingEvents.length + ')' : ''}`;
+        document.querySelector('.tab[onclick*="past"]').textContent = `Eventos Passados ${pastEvents.length ? '(' + pastEvents.length + ')' : ''}`;
+        
+        // Mostrar eventos nas respectivas seções
+        createEventCards(todayEvents, 'today-events');
+        createEventCards(tomorrowEvents, 'tomorrow-events');
+        createEventCards(weekendEvents, 'weekend-events');
+        createEventCards(upcomingEvents, 'upcoming-events');
+        createEventCards(pastEvents, 'past-events');
+        
+        // Se não houver eventos em uma categoria específica, mostrar mensagem
+        if (currentTab === 'today' && todayEvents.length === 0) {
+          document.getElementById('no-events').style.display = 'block';
+        } else if (currentTab === 'weekend' && weekendEvents.length === 0) {
+          document.getElementById('no-events').style.display = 'block';
+        } else if (currentTab === 'upcoming' && upcomingEvents.length === 0) {
+          document.getElementById('no-events').style.display = 'block';
+        } else if (currentTab === 'past' && pastEvents.length === 0) {
+          document.getElementById('no-events').style.display = 'block';
+        }
+      }
+      
+      // Função para criar cards de eventos para uma seção
+      function createEventCards(eventos, containerId) {
+        const container = document.getElementById(containerId);
+        
+        eventos.forEach(evento => {
+          const col = document.createElement('div');
+          col.className = 'col-md-4 mb-4';
+          
+          // Formatar data para exibição
+          const eventDate = parseDateString(evento.quando);
+          const formattedDate = new Intl.DateTimeFormat('pt-BR', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+          }).format(eventDate);
+          
+          // Determinar se é um evento passado
+          const isPast = eventDate < new Date();
+          
+          // Definir classe com base no status do evento
+          let statusClass = isPast ? 'past-event' : 'upcoming-event';
+          
+          // Construir a URL da imagem
+          const imageUrl = `https://mtcporto.pythonanywhere.com/eventos/default/imagem/${evento.imagem}`;
+          
+          const card = document.createElement('div');
+          card.className = 'card h-100 ' + statusClass;
+          card.innerHTML = `
+            <div class="card-img-top-container">
+              <div class="card-img-loading-placeholder">
+                <div class="spinner-border spinner-border-sm" role="status">
+                  <span class="visually-hidden">Carregando...</span>
+                </div>
+              </div>
+              <img src="data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==" 
+                data-src="${imageUrl}" class="card-img-top" alt="${evento.oque}" loading="lazy">
+              ${isPast ? '<div class="past-badge">Evento Passado</div>' : ''}
+            </div>
+            <div class="card-body">
+              <h5 class="card-title">${evento.oque}</h5>
+              <p class="card-text">
+                <i class="far fa-calendar-alt"></i> ${formattedDate}<br>
+                <i class="fas fa-map-marker-alt"></i> ${evento.local}, ${evento.onde}
+                ${evento.endereco ? `<br><small>${evento.endereco}</small>` : ''}
+              </p>
+              <div class="d-flex justify-content-between align-items-center">
+                ${evento.preco 
+                  ? `<span class="badge bg-success">R$ ${evento.preco}</span>` 
+                  : '<span class="badge bg-info">Gratuito ou não informado</span>'}
+                <span class="badge bg-secondary">${evento.tipo || 'Não categorizado'}</span>
+              </div>
+            </div>
+            <div class="card-footer">
+              <small class="text-muted">Fonte: ${evento.fonte}</small>
+              ${evento.id 
+                ? `<button class="btn btn-sm btn-outline-primary float-end edit-btn" data-id="${evento.id}">
+                    <i class="fas fa-edit"></i>
+                   </button>` 
+                : ''}
+            </div>
+          `;
+          
+          col.appendChild(card);
+          container.appendChild(col);
+          
+          // Carregar a imagem com lazy loading
+          const imgElement = card.querySelector('img.card-img-top');
+          const loadingPlaceholder = card.querySelector('.card-img-loading-placeholder');
+          
+          // Iniciar carregamento da imagem
+          preloadImage(imageUrl)
+            .then(() => {
+              // Quando a imagem carregar, exibi-la e remover o placeholder
+              imgElement.src = imageUrl;
+              imgElement.onload = () => {
+                if (loadingPlaceholder) {
+                  loadingPlaceholder.style.display = 'none';
+                }
+              };
+            })
+            .catch(() => {
+              // Em caso de erro, mostrar placeholder de erro
+              loadingPlaceholder.innerHTML = '<div class="img-error"><i class="fas fa-image"></i></div>';
+            });
+        });
+      }
+      
+      // Função para exibir os eventos no DOM - para manter compatibilidade
       function displayEventos(eventos) {
+        // Esta função é mantida para compatibilidade com o código existente
         const container = document.getElementById('eventos-container');
+        if (!container) return; // Evitar erros se o container foi removido
+        
         container.innerHTML = '';
         
         // Se não há eventos, mostrar mensagem
         if (eventos.length === 0) {
-          document.getElementById('no-events').style.display = 'block';
           return;
         }
-        
-        // Esconder mensagem de "nenhum evento encontrado"
-        document.getElementById('no-events').style.display = 'none';
-        
-        // Filtrar eventos conforme necessário
-        const filteredEventos = currentFilter === 'todos' 
-          ? eventos 
-          : eventos.filter(evento => evento.tipo && evento.tipo.toLowerCase() === currentFilter);
-        
-        if (filteredEventos.length === 0) {
-          document.getElementById('no-events').style.display = 'block';
-          return;
-        }
-        
-        // Ordenar eventos por data
-        filteredEventos.sort((a, b) => {
-          const dataA = parseDateString(a.quando);
-          const dataB = parseDateString(b.quando);
-          return dataA - dataB;
-        });
         
         // Criar cards para cada evento
         filteredEventos.forEach(evento => {
@@ -828,21 +1056,17 @@
         return new Date(year, month, day, hour, minute);
       }
       
-      // Configurar filtros
-      document.querySelectorAll('.filter-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
-          // Remover classe active de todos os botões
-          document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-          
-          // Adicionar classe active ao botão clicado
-          this.classList.add('active');
-          
-          // Atualizar filtro corrente
-          currentFilter = this.getAttribute('data-filter');
-          
-          // Reexibir eventos com o novo filtro
-          displayEventos(eventos);
-        });
+      // Configurar os eventos para os filtros dropdown
+      document.getElementById('filterLocal').addEventListener('change', function() {
+        aplicarFiltros();
+      });
+      
+      document.getElementById('filterFonte').addEventListener('change', function() {
+        aplicarFiltros();
+      });
+      
+      document.getElementById('searchQuery').addEventListener('input', function() {
+        aplicarFiltros();
       });
       
       // Restante do código...
