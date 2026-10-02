@@ -291,6 +291,8 @@
 <body>
   <div class="container">
     <h2>Mini Agente de Eventos (Modo Gemini)</h2>
+    <label for="geminiApiKey">Sua chave Gemini (usada somente nesta página)</label>
+    <input id="geminiApiKey" type="password" autocomplete="off" spellcheck="false" />
     
     <div style="text-align: center; margin-bottom: 15px;">
       <a href="index.html" style="color: var(--primary); font-size: 0.9em; text-decoration: none;">← Voltar para escolha</a>
@@ -337,7 +339,6 @@
   </div>
 
   <script>    // --- Configuração ---
-    const GEMINI_API_KEY = "AIzaSyAQR7qRaUJ6wpEq_RrGSUzodbkmVbz7Gdk"; // <= SUBSTITUA PELA SUA CHAVE
     const GEMINI_MODEL_ID = "gemini-1.5-flash-latest"; // Modelo a ser usado
     const GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/models/";
       // Endpoint da API - usar apenas produção
@@ -507,6 +508,11 @@
     
     // Processar imagem com Gemini
     async function processImage() {
+      const GEMINI_API_KEY = document.getElementById("geminiApiKey").value.trim();
+      if (!GEMINI_API_KEY) {
+        alert("Informe sua chave Gemini para processar a imagem.");
+        return;
+      }
       // Mostrar estado de carregamento
       document.getElementById("loading").style.display = "block";
       document.getElementById("processButton").disabled = true;
